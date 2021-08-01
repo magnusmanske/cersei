@@ -12,6 +12,7 @@ class Scraper1(ScraperBase):
 		super().__init__()
 		self.scraper_id = 1
 		self.url_pattern = "http://www.slovnikceskeliteratury.cz/showContent.jsp?docId=$1"
+		self.language = 'cz'
 
 	def paginate_index(self):
 		pageNr = 1
@@ -35,19 +36,22 @@ class Scraper1(ScraperBase):
 	def parse_index_page(self,html):
 		soup = BeautifulSoup(html,features="html.parser")
 		for div in soup.find_all('div', class_="result"):
-			o = Entry()
+			o = Entry(self.scraper_id)
 			descs = []
 			for link in div.find_all('a', class_="result_name"):
-				o.original_label = link.get_text().strip()
-				o.pretty_label = o.original_label
-				o.pretty_label = re.sub(r'^.+? - +','',o.pretty_label)
-				o.pretty_label = re.sub(r' *\(.*$','',o.pretty_label)
-				o.pretty_label = re.sub(r'^(.+?), (.+)$',r'\2 \1',o.pretty_label)
+				original_label = link.get_text().strip()
+				pretty_label = original_label
+				pretty_label = re.sub(r'^.+? - +','',pretty_label)
+				pretty_label = re.sub(r' *\(.*$','',pretty_label)
+				pretty_label = re.sub(r'^(.+?), (.+)$',r'\2 \1',pretty_label)
+				o.add_label_etc(original_label,"original_label",self.language)
+				o.add_label_etc(pretty_label,"label",self.language)
 				href = link.get('href')
 				m = re.match(r"^.*docId=(\d+).*$",href)
 				if m:
 					o.id = m.group(1)
-					o.url = self.construct_entry_url_from_id(o.id)
+					url = self.construct_entry_url_from_id(o.id)
+					o.add_label_etc(url,"url",self.language)
 			for span in div.find_all('span', class_="datumnarozeni"):
 				s = re.sub(r"\s+"," ",span.get_text()).strip()
 				self.parse_date_prop(o,s,"P569")

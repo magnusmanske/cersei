@@ -1,3 +1,4 @@
+import abc
 import datetime
 
 class Value(metaclass=abc.ABCMeta):
@@ -7,7 +8,7 @@ class Value(metaclass=abc.ABCMeta):
 
 	@abc.abstractmethod
 	def db_fields(self):
-		"""Returns the fields in the table(), except for id and revision_id"""
+		"""Returns the fields in the table(), except for id, revision_id, and property"""
 
 	@abc.abstractmethod
 	def db_values(self, db):
@@ -15,8 +16,125 @@ class Value(metaclass=abc.ABCMeta):
 		Requires db to query/create text values.
 		"""
 
+
+class StringValue(Value):
+	def __init__(self, value):
+		super().__init__()
+		self.value = value
+
+	def __str__(self):
+		return self.value
+
+	def db_table(self):
+		return "string"
+
+	def db_fields(self):
+		return ["text_id"]
+
+	def db_values(self, db):
+		text_id = db.get_or_create_text(self.value)
+		return [text_id]
+
+class FreetextValue(Value):
+	def __init__(self, value):
+		super().__init__()
+		self.value = value
+
+	def __str__(self):
+		return self.value
+
+	def db_table(self):
+		return "freetext"
+
+	def db_fields(self):
+		return ["text_id"]
+
+	def db_values(self, db):
+		text_id = db.get_or_create_text(self.value)
+		return [text_id]
+
+class ItemValue(Value):
+	LETTER_TO_TYPE = {
+		"P":"property",
+		"Q":"item",
+		"L":"lexeme"
+	}
+
+	def __init__(self, q):
+		super().__init__()
+		q = q.strip().upper()
+		if length(q) < 2:
+			raise Exception("ItemValue: "+q+" is too short")
+		letter = str(q[0])
+		if q not in self.LETTER_TO_TYPE:
+			raise Exception("ItemValue: "+q+" has unknown letter '"+letter+"'")
+		number_string = str(q[1:])
+		if not number_string.isnumeric():
+			raise Exception("ItemValue: "+number_string+" is not numeric")
+		self.item_id = int(number_string)
+		self.item_type = self.LETTER_TO_TYPE[letter]
+
+	def __str__(self):
+		return self.item_id+" ("+self.item_type+")"
+
+	def db_table(self):
+		return "item"
+
+	def db_fields(self):
+		return ["item_id","item_type"]
+
+	def db_values(self, db):
+		return [self.item_id,self.item_type]
+
+class LabelsEtcValue(Value):
+	ALLOWED_TYPES = ('original_label','label','alias','description','url')
+
+	def __init__(self, value, type_name, language):
+		super().__init__()
+		self.type_name = str(type_name).strip().lower()
+		if self.type_name not in self.ALLOWED_TYPES:
+			raise Exception("LabelsEtcValue: Type name '"+type_name+"' is not valid; allowed: "+str(self.ALLOWED_TYPES))
+		self.value = str(value).strip()
+		self.language = str(language).strip()
+
+	def __str__(self):
+		return self.type_name.upper()+" "+self.language+":"+self.value
+
+	def db_table(self):
+		return "labels_etc"
+
+	def db_fields(self):
+		return ["type_name","language_id","text_id"]
+
+	def db_values(self, db):
+		language_id = db.get_or_create_text(self.language)
+		text_id = db.get_or_create_text(self.value)
+		return [self.type_name,language_id,text_id]
+
+
+class MonolingualStringValue(Value):
+	def __init__(self, language, value):
+		super().__init__()
+		self.value = str(value).strip()
+		self.language = str(language).strip()
+
+	def __str__(self):
+		return self.language+":"+self.value
+
+	def db_table(self):
+		return "monolingual_string"
+
+	def db_fields(self):
+		return ["language_id","text_id"]
+
+	def db_values(self, db):
+		language_id = db.get_or_create_text(self.language)
+		text_id = db.get_or_create_text(self.value)
+		return [language_id,text_id]
+
 class TimeValue(Value):
 	def __init__(self, dt=None, ymd=None, precision=9, tv=None ):
+		super().__init__()
 		if dt is None and ymd is not None:
 			dt = datetime.datetime(int(ymd[0]),int(ymd[1]),int(ymd[2]))
 		self.time_value = tv
@@ -39,4 +157,4 @@ class TimeValue(Value):
 		return ["value","precision"]
 
 	def db_values(self, db):
-		return [str(self.time_value),str(self.precision)]
+		return [str(self.time_value),self.precision]

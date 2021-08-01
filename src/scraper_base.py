@@ -1,11 +1,11 @@
 import abc
-from src.ToolDatabase import ToolDatabase
+from src.tooldatabase import ToolDatabase
 
 class ScraperBase(metaclass=abc.ABCMeta):
 	def __init__(self):
 		self.enforce_unique_ids = True
 		self.url_pattern = ''
-		self.scraper_id = 1
+		self.scraper_id = None
 		self.db = None
 
 	@abc.abstractmethod
