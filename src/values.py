@@ -16,7 +16,6 @@ class Value(metaclass=abc.ABCMeta):
 		Requires db to query/create text values.
 		"""
 
-
 class StringValue(Value):
 	def __init__(self, value):
 		super().__init__()
@@ -24,6 +23,9 @@ class StringValue(Value):
 
 	def __str__(self):
 		return self.value
+
+	def __lt__(self,other):
+		return self.value<other.value
 
 	def db_table(self):
 		return "string"
@@ -42,6 +44,9 @@ class FreetextValue(Value):
 
 	def __str__(self):
 		return self.value
+
+	def __lt__(self,other):
+		return self.value<other.value
 
 	def db_table(self):
 		return "freetext"
@@ -77,6 +82,11 @@ class ItemValue(Value):
 	def __str__(self):
 		return self.item_id+" ("+self.item_type+")"
 
+	def __lt__(self,other):
+		if self.item_type!=other.item_type:
+			return self.item_type<other.item_type
+		return self.item_id<other.item_id
+
 	def db_table(self):
 		return "item"
 
@@ -100,6 +110,13 @@ class LabelsEtcValue(Value):
 	def __str__(self):
 		return self.type_name.upper()+" "+self.language+":"+self.value
 
+	def __lt__(self,other):
+		if self.type_name!=other.type_name:
+			return self.type_name<other.type_name
+		if self.language!=other.language:
+			return self.language<other.language
+		return self.value<other.value
+
 	def db_table(self):
 		return "labels_etc"
 
@@ -120,6 +137,11 @@ class MonolingualStringValue(Value):
 
 	def __str__(self):
 		return self.language+":"+self.value
+
+	def __lt__(self,other):
+		if self.language!=other.language:
+			return self.language<other.language
+		return self.value<other.value
 
 	def db_table(self):
 		return "monolingual_string"
@@ -149,6 +171,11 @@ class TimeValue(Value):
 
 	def __str__(self):
 		return self.time_value+"/"+str(self.precision)
+
+	def __lt__(self,other):
+		if self.precision!=other.precision:
+			return self.precision<other.precision
+		return self.time_value<other.time_value
 
 	def db_table(self):
 		return "time"

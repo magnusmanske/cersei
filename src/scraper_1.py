@@ -12,7 +12,7 @@ class Scraper1(ScraperBase):
 		super().__init__()
 		self.scraper_id = 1
 		self.url_pattern = "http://www.slovnikceskeliteratury.cz/showContent.jsp?docId=$1"
-		self.language = 'cz'
+		self.language = 'cs'
 
 	def paginate_index(self):
 		pageNr = 1

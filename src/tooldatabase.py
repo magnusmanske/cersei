@@ -1,3 +1,4 @@
+import pymysql
 import toolforge
 
 class ToolDatabase :
@@ -51,6 +52,12 @@ class ToolDatabase :
 			print (values)
 			cursor.execute(sql, values)
 			self.connection.commit()
+
+	def load_table_for_revision(self,revision_id,table):
+		with self.connection.cursor(pymysql.cursors.DictCursor) as cursor:
+			sql = "SELECT * FROM `"+table+"` WHERE `revision_id`=%s"
+			cursor.execute(sql, (revision_id,))
+			return cursor.fetchall()
 
 
 	"""Returns the ID of the text, if it is in the `text` table.
