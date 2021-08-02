@@ -6,11 +6,6 @@ from src.values import TimeValue
 from src.entry import Entry
 
 class Scraper1(ScraperBase):
-	HARDCODED = {
-		"places":{
-			"Praha":"Q1085"
-		}
-	}
 
 	"""Slovnikceske Literatury CZ
 	"""
@@ -109,7 +104,3 @@ class Scraper1(ScraperBase):
 		except: # Couldn't parse date
 			o.add_freetext(prop,date_string)
 
-	def string2item(self,prop,s):
-		if prop in ["P19","P20"]:
-			if s in self.HARDCODED["places"]:
-				return self.HARDCODED["places"][s]

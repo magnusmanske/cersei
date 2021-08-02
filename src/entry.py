@@ -32,6 +32,7 @@ class Entry:
 			"string":[],
 			"item":[],
 			"time":[],
+			"location":[],
 			"freetext":[],
 			"monolingual_string":[],
 			"labels_etc":[]
@@ -54,7 +55,7 @@ class Entry:
 	def load_from_revision(self,db,revision_id):
 		self.revision_id = revision_id
 		for table,value in self.values.items():
-			if table=="time":
+			if table in ["time","location"]:
 				query_table=table
 			else:
 				query_table="vw_"+table
@@ -63,17 +64,19 @@ class Entry:
 				continue
 			for row in rows:
 				if table=="string":
-					o = StringValue(row["value"])
+					o = StringValue(row["value"].decode('utf8'))
 				elif table=="item":
 					o = ItemValue(row["q"])
 				elif table=="time":
 					o = TimeValue(tv=row["value"],precision=row["precision"])
+				elif table=="location":
+					o = LocationValue(latitude=row["longitude"],longitude=row["longitude"])
 				elif table=="freetext":
-					o = FreetextValue(row["value"])
+					o = FreetextValue(row["value"].decode('utf8'))
 				elif table=="monolingual_string":
-					o = MonolingualStringValue(row["language"],row["value"])
+					o = MonolingualStringValue(row["language"].decode('utf8'),row["value"].decode('utf8'))
 				elif table=="labels_etc":
-					o = LabelsEtcValue(row["value"],row["type_name"],row["language"])
+					o = LabelsEtcValue(row["value"].decode('utf8'),row["type_name"],row["language"].decode('utf8'))
 				prop = 0
 				if "property" in row:
 					prop = int(row["property"])
@@ -99,7 +102,7 @@ class Entry:
 		self.revision_id = db.get_current_revision_id(self.entry_id)
 		if self.revision_id!=0 and not self.has_revision_changed(db):
 			return
-		print ("Creating new revision for "+str(self.entry_id))
+		#print ("Creating new revision for "+str(self.entry_id))
 		self.revision_id = db.create_new_revision(self.entry_id)
 		db.set_current_revision(self.entry_id,self.revision_id)
 
@@ -146,6 +149,11 @@ class Entry:
 	def add_time(self,prop,tv: TimeValue):
 		prop = self.sanitize_property(prop)
 		self.values["time"].append(PropertyValue(prop,tv))
+
+	def add_location(self, prop, latitude: float, longitude: float):
+		prop = self.sanitize_property(prop)
+		value = LocationValue(latitude, longitude)
+		self.values["location"].append(PropertyValue(prop,value))
 
 	def add_freetext(self,prop,string: str):
 		prop = self.sanitize_property(prop)

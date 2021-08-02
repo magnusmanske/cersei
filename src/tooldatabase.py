@@ -57,6 +57,34 @@ class ToolDatabase :
 			cursor.execute(sql, (revision_id,))
 			return cursor.fetchall()
 
+	def find_text_item_match(self, text: str, group: str, languages: list):
+		text_id = self.get_or_create_text(text)
+		placeholders = ["%s" for language in languages]
+		params = [text_id,group]
+		params += languages
+		with self.connection.cursor(pymysql.cursors.DictCursor) as cursor:
+			sql = "SELECT DISTINCT `item_id` FROM `text2item` WHERE `text_id`=%s AND `group`=%s AND `language` IN ("
+			sql += ",".join(placeholders) + ")"
+			cursor.execute(sql, params)
+			rows = cursor.fetchall()
+			if len(rows)!=1: # This includes multiple candidates
+				return
+			return "Q"+str(rows[0]["item_id"])
+
+
+	def get_item2text_candidates(self, scraper_id, min_count=10):
+		with self.connection.cursor(pymysql.cursors.DictCursor) as cursor:
+			sql = "SELECT * FROM vw_item_candidates WHERE scraper_id=%s AND cnt>=%s"
+			cursor.execute(sql, (scraper_id,min_count))
+			return cursor.fetchall()
+
+	def add_text2item(self,language,group,text,item):
+		item_id = int(str(item)[1:])
+		text_id = self.get_or_create_text(text)
+		with self.connection.cursor() as cursor:
+			sql = "INSERT IGNORE INTO `text2item` (`language`,`group`,`text_id`,`item_id`) VALUES (%s,%s,%s,%s)"
+			cursor.execute(sql, (language,group,text_id,item_id))
+			return cursor.lastrowid
 
 	"""Returns the ID of the text, if it is in the `text` table.
 	Creates a new row if not, and returns the new ID.

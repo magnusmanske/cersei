@@ -185,3 +185,26 @@ class TimeValue(Value):
 
 	def db_values(self, db):
 		return [str(self.time_value),self.precision]
+
+class LocationValue(Value):
+	def __init__(self, latitude: float, longitude: float):
+		super().__init__()
+		self.latitude = latitude
+		self.longitude = longitude
+
+	def __str__(self):
+		return str(self.latitude)+", "+str(self.longitude)
+
+	def __lt__(self,other):
+		if self.latitude!=other.latitude:
+			return self.latitude<other.latitude
+		return self.longitude<other.longitude
+
+	def db_table(self):
+		return "location"
+
+	def db_fields(self):
+		return ["latitude","longitude"]
+
+	def db_values(self, db):
+		return [self.latitude,self.longitude]
