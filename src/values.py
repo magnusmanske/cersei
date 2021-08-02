@@ -68,10 +68,10 @@ class ItemValue(Value):
 	def __init__(self, q):
 		super().__init__()
 		q = q.strip().upper()
-		if length(q) < 2:
+		if len(q) < 2:
 			raise Exception("ItemValue: "+q+" is too short")
 		letter = str(q[0])
-		if q not in self.LETTER_TO_TYPE:
+		if letter not in self.LETTER_TO_TYPE:
 			raise Exception("ItemValue: "+q+" has unknown letter '"+letter+"'")
 		number_string = str(q[1:])
 		if not number_string.isnumeric():
@@ -80,7 +80,7 @@ class ItemValue(Value):
 		self.item_type = self.LETTER_TO_TYPE[letter]
 
 	def __str__(self):
-		return self.item_id+" ("+self.item_type+")"
+		return str(self.item_id)+" ("+self.item_type+")"
 
 	def __lt__(self,other):
 		if self.item_type!=other.item_type:

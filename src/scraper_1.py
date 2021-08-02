@@ -6,6 +6,12 @@ from src.values import TimeValue
 from src.entry import Entry
 
 class Scraper1(ScraperBase):
+	HARDCODED = {
+		"places":{
+			"Praha":"Q1085"
+		}
+	}
+
 	"""Slovnikceske Literatury CZ
 	"""
 	def __init__(self):
@@ -18,7 +24,6 @@ class Scraper1(ScraperBase):
 		pageNr = 1
 		while True:
 			url = "http://www.slovnikceskeliteratury.cz/list.jsp?show=-&order=title&ascDesc=asc&startswith="
-			#print (str(pageNr)+": "+url)
 			page = requests.post(url, data = {"page":1,"pageNr":pageNr})
 			html = page.text
 			yield html
@@ -58,8 +63,14 @@ class Scraper1(ScraperBase):
 				descs.append(s)
 			for span in div.find_all('span', class_="mistonarozeni"):
 				s = re.sub(r"\s+"," ",span.get_text()).strip()
-				if s!="":
-					o.add_freetext("P19",s)
+				if s=="":
+					continue
+				prop = "P19"
+				item = self.string2item(prop,s)
+				if item is None:
+					o.add_freetext(prop,s)
+				else:
+					o.add_item(prop,item)
 				descs.append(s)
 			for span in div.find_all('span', class_="datumumrti"):
 				s = re.sub(r"\s+"," ",span.get_text()).strip()
@@ -67,8 +78,14 @@ class Scraper1(ScraperBase):
 				descs.append(s)
 			for span in div.find_all('span', class_="mistoumrti"):
 				s = re.sub(r"\s+"," ",span.get_text()).strip()
-				if s!="":
-					o.add_freetext("P20",s)
+				if s=="":
+					continue
+				prop = "P20"
+				item = self.string2item(prop,s)
+				if item is None:
+					o.add_freetext(prop,s)
+				else:
+					o.add_item(prop,item)
 				descs.append(s)
 			descs_no_empty = filter(lambda d: d.strip()!="", descs)
 			o.short_description = "; ".join(descs_no_empty)
@@ -91,3 +108,8 @@ class Scraper1(ScraperBase):
 				o.add_freetext(prop,date_string)
 		except: # Couldn't parse date
 			o.add_freetext(prop,date_string)
+
+	def string2item(self,prop,s):
+		if prop in ["P19","P20"]:
+			if s in self.HARDCODED["places"]:
+				return self.HARDCODED["places"][s]

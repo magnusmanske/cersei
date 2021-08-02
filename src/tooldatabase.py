@@ -48,8 +48,6 @@ class ToolDatabase :
 					sql += "%s"
 					values.append(value)
 				sql += ")"
-			print (sql)
-			print (values)
 			cursor.execute(sql, values)
 			self.connection.commit()
 

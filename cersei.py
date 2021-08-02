@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 
-from src.scraper_1 import Scraper1
+import sys
+import importlib
 
 if __name__ == "__main__":
-	scraper = Scraper1()
-	for html in scraper.paginate_index():
-		for o in scraper.parse_index_page(html):
-			print ("---")
-			print (str(o))
-			o.create_or_update_in_database(scraper.get_db())
-		exit(0)
+	if sys.argv[1] == 'run':
+		module_name = "src.scraper_"+str(sys.argv[2])
+		class_name = "Scraper"+str(sys.argv[2])
+		module = importlib.import_module(module_name)
+		class_ = getattr(module, class_name)
+		scraper = class_()
+		for html in scraper.paginate_index():
+			for o in scraper.parse_index_page(html):
+				o.create_or_update_in_database(scraper.get_db())
+			exit(0)

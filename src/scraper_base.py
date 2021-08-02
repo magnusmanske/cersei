@@ -24,6 +24,9 @@ class ScraperBase(metaclass=abc.ABCMeta):
 	def construct_entry_url_from_id(self,id):
 		"""Constructs the URL of the entry based on its ID"""
 
+	def string2item(self,prop,s):
+		pass
+
 	def get_db(self):
 		if self.db:
 			return self.db

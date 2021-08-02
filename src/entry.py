@@ -98,22 +98,22 @@ class Entry:
 			self.entry_id = db.get_entry_id_for_scraper_and_id(self.scraper_id, self.id)
 		self.revision_id = db.get_current_revision_id(self.entry_id)
 		if self.revision_id!=0 and not self.has_revision_changed(db):
-			print ("Revision unchanged")
 			return
+		print ("Creating new revision for "+str(self.entry_id))
 		self.revision_id = db.create_new_revision(self.entry_id)
 		db.set_current_revision(self.entry_id,self.revision_id)
 
 		# Generate INSERT statements
-		for table,values in self.values.items():
-			if len(values) == 0:
+		for table,prop_values in self.values.items():
+			if len(prop_values) == 0:
 				continue
 			columns = ["revision_id"]
 			has_property = (table!="labels_etc")
 			if has_property:
 				columns.append("property")
-			columns += values.value.value.db_fields()
+			columns += prop_values[0].value.db_fields()
 			rows = []
-			for prop_value in values:
+			for prop_value in prop_values:
 				row = [ self.revision_id ]
 				if has_property:
 					row.append(prop_value.prop)
