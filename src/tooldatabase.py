@@ -51,6 +51,16 @@ class ToolDatabase :
 			cursor.execute(sql, values)
 			self.connection.commit()
 
+	def delete_rows_by_id(self,table,ids):
+		ids = list(map(lambda id:str(id), ids))
+		ids = list(filter(lambda id: id.isnumeric(), ids))
+		if len(ids)==0:
+			return
+		sql = "DELETE FROM `"+table+"` WHERE `id` IN (" + ",".join(ids) + ")"
+		with self.connection.cursor() as cursor:
+			cursor.execute(sql, ())
+			self.connection.commit()
+
 	def load_table_for_revision(self,revision_id,table):
 		with self.connection.cursor(pymysql.cursors.DictCursor) as cursor:
 			sql = "SELECT * FROM `"+table+"` WHERE `revision_id`=%s"
@@ -85,6 +95,24 @@ class ToolDatabase :
 			sql = "INSERT IGNORE INTO `text2item` (`language`,`group`,`text_id`,`item_id`) VALUES (%s,%s,%s,%s)"
 			cursor.execute(sql, (language,group,text_id,item_id))
 			return cursor.lastrowid
+
+	def get_freetext2item(self,scraper_id,group,props,language):
+		with self.connection.cursor(pymysql.cursors.DictCursor) as cursor:
+			sql = """
+SELECT property,text2item.item_id,revision_id,freetext.id AS freetext_id FROM text2item,freetext,revision,entry
+WHERE text2item.text_id=freetext.text_id
+AND text2item.group=%s
+AND text2item.language IN ("",%s)
+AND revision_id=revision.id
+AND revision.entry_id=entry.id
+AND entry.scraper_id=%s
+AND freetext.property in (
+			""".replace("\n"," ").strip()
+			placeholders = ["%s" for props in props]
+			sql += ",".join(placeholders) + ")"
+			params = [group,language,scraper_id]+props
+			cursor.execute(sql, params)
+			return cursor.fetchall()
 
 	"""Returns the ID of the text, if it is in the `text` table.
 	Creates a new row if not, and returns the new ID.

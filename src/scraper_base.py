@@ -58,11 +58,17 @@ class ScraperBase(metaclass=abc.ABCMeta):
 		for html in self.paginate_index():
 			for o in self.parse_index_page(html):
 				o.create_or_update_in_database(db)
+		self.text2item_heuristic()
 
 	def place_heuristic(self,text):
 		# Big city, City, Capital city, capital of region, district town
 		hints = ["Q1549591","Q515","Q5119","Q12031379","Q8452914"]
 		return self.run_heuristic(text,hints,"P19")
+
+	def occupation_heuristic(self,text):
+		# Occupation
+		hints = ["Q12737077"]
+		return self.run_heuristic(text,hints,"P106")
 
 	def run_heuristic(self,text,hints,example_property):
 		s2i = self.string2item(example_property,text)
@@ -72,20 +78,20 @@ class ScraperBase(metaclass=abc.ABCMeta):
 			self.dbwd = toolforge.connect('wikidatawiki')
 		with self.dbwd.cursor() as cursor:
 			sql = """
-SELECT DISTINCT page_title
-FROM wbt_text_in_lang,wbt_text,wbt_term_in_lang,wbt_item_terms,page,pagelinks
-WHERE wbx_text=%s
-AND wbx_id=wbxl_text_id
-AND wbxl_language=%s
-AND wbxl_id=wbtl_text_in_lang_id
-AND wbtl_type_id IN (1,3)
-AND wbtl_id=wbit_term_in_lang_id
-AND page_title=concat("Q",wbit_item_id)
-AND page_namespace=0
-AND pl_from=page_id
-AND pl_namespace=0
-AND pl_title IN (
-""".replace("\n"," ").strip()
+				SELECT DISTINCT page_title
+				FROM wbt_text_in_lang,wbt_text,wbt_term_in_lang,wbt_item_terms,page,pagelinks
+				WHERE wbx_text=%s
+				AND wbx_id=wbxl_text_id
+				AND wbxl_language=%s
+				AND wbxl_id=wbtl_text_in_lang_id
+				AND wbtl_type_id IN (1,3)
+				AND wbtl_id=wbit_term_in_lang_id
+				AND page_title=concat("Q",wbit_item_id)
+				AND page_namespace=0
+				AND pl_from=page_id
+				AND pl_namespace=0
+				AND pl_title IN (
+				""".replace("\n"," ").strip()
 			placeholders = ["%s" for hint in hints]
 			sql += ",".join(placeholders) + ")"
 			params = [text,self.language]
@@ -102,6 +108,45 @@ AND pl_title IN (
 			db.add_text2item(self.language,group,text,item)
 			return item
 
+	"""Finds freetext rows that can be converted to items,
+	creates the item rows and deletes the freetext ones.
+	It does *not* create new revisions.
+	"""
+	def convert_freetext_to_item(self):
+		groups = {}
+		for prop,group in self.PROP2GROUP.items():
+			if group not in groups:
+				groups[group] = []
+			groups[group].append(int(prop[1:]))
+		db = self.get_db()
+		for group,props in groups.items():
+			rows = db.get_freetext2item(self.scraper_id,group,props,self.language)
+			if rows is None or len(rows)==0:
+				continue
+			freetext_counter = {}
+			for row in rows:
+				fid = row["freetext_id"]
+				if fid not in freetext_counter:
+					freetext_counter[fid] = 0
+				freetext_counter[fid] += 1
+			columns = ["property","item_id","item_type","revision_id"]
+			rows2db = []
+			freetext2delete = []
+			for row in rows:
+				fid = row["freetext_id"]
+				if freetext_counter[fid]>1:
+					print ("Freetext row "+str(fid)+" has multiple replacements, skipping")
+					continue
+				new_row = [row["property"],row["item_id"],"item",row["revision_id"]]
+				rows2db.append(new_row)
+				freetext2delete.append(fid)
+			if len(freetext2delete)+len(rows2db)==0:
+				continue
+			print ("Moving "+str(len(rows2db))+" freetext rows to items")
+			db.insert_group("item",columns,rows2db)
+			db.delete_rows_by_id("freetext",freetext2delete)
+
+
 	def text2item_heuristic(self):
 		if self.scraper_id is None:
 			return
@@ -115,7 +160,7 @@ AND pl_title IN (
 				return
 			group = self.PROP2GROUP[prop]
 			if group=="place":
-				item = self.place_heuristic(row["value"].decode('utf8'))
-				if item is None:
-					continue
-
+				self.place_heuristic(row["value"].decode('utf8'))
+			if group=="occupation":
+				self.occupation_heuristic(row["value"].decode('utf8'))
+		self.convert_freetext_to_item()
