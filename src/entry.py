@@ -23,20 +23,16 @@ class PropertyValue:
 		return not (self==other)
 
 class Entry:
+	VALUE_TABLES = ["string","item","time","location","freetext","monolingual_string","labels_etc"]
+
 	def __init__(self, scraper_id):
 		self.scraper_id = scraper_id
 		self.id = None
 		self.entry_id = None
 		self.revision_id = None
-		self.values = {
-			"string":[],
-			"item":[],
-			"time":[],
-			"location":[],
-			"freetext":[],
-			"monolingual_string":[],
-			"labels_etc":[]
-		}
+		self.values = {}
+		for table in self.VALUE_TABLES:
+			self.values[table]=[]
 
 	def __str__(self):
 		if self.id is None:
@@ -102,7 +98,6 @@ class Entry:
 		self.revision_id = db.get_current_revision_id(self.entry_id)
 		if self.revision_id!=0 and not self.has_revision_changed(db):
 			return
-		#print ("Creating new revision for "+str(self.entry_id))
 		self.revision_id = db.create_new_revision(self.entry_id)
 		db.set_current_revision(self.entry_id,self.revision_id)
 
@@ -124,24 +119,32 @@ class Entry:
 				rows.append(row)
 			db.insert_group(table,columns,rows)
 
-
 	def sanitize_property(self,prop) -> int:
 		prop = str(prop).strip().upper()
 		if prop[0]=="P":
 			prop = prop[1:]
 		return int(prop)
 
-
 	def add_label_etc(self,value,type_name,language):
+		if value is None or value.strip()=="":
+			return
+		if type_name is None or type_name.strip()=="":
+			return
+		if language is None or language.strip()=="":
+			return
 		v = LabelsEtcValue(value,type_name,language)
 		self.values["labels_etc"].append(PropertyValue(0,v))
 
 	def add_string(self,prop,string: str):
+		if string is None or string.strip()=="":
+			return
 		prop = self.sanitize_property(prop)
 		value = StringValue(string)
 		self.values["string"].append(PropertyValue(prop,value))
 
 	def add_item(self,prop,q: str):
+		if q is None or q.strip()=="":
+			return
 		prop = self.sanitize_property(prop)
 		item = ItemValue(q)
 		self.values["item"].append(PropertyValue(prop,item))
@@ -156,6 +159,8 @@ class Entry:
 		self.values["location"].append(PropertyValue(prop,value))
 
 	def add_freetext(self,prop,string: str):
+		if string is None or string.strip()=="":
+			return
 		prop = self.sanitize_property(prop)
 		value = FreetextValue(string)
 		self.values["freetext"].append(PropertyValue(prop,value))

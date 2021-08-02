@@ -82,7 +82,7 @@ class ToolDatabase :
 			return "Q"+str(rows[0]["item_id"])
 
 
-	def get_item2text_candidates(self, scraper_id, min_count=10):
+	def get_item2text_candidates(self, scraper_id, min_count=3):
 		with self.connection.cursor(pymysql.cursors.DictCursor) as cursor:
 			sql = "SELECT * FROM vw_item_candidates WHERE scraper_id=%s AND cnt>=%s"
 			cursor.execute(sql, (scraper_id,min_count))
@@ -99,20 +99,45 @@ class ToolDatabase :
 	def get_freetext2item(self,scraper_id,group,props,language):
 		with self.connection.cursor(pymysql.cursors.DictCursor) as cursor:
 			sql = """
-SELECT property,text2item.item_id,revision_id,freetext.id AS freetext_id FROM text2item,freetext,revision,entry
-WHERE text2item.text_id=freetext.text_id
-AND text2item.group=%s
-AND text2item.language IN ("",%s)
-AND revision_id=revision.id
-AND revision.entry_id=entry.id
-AND entry.scraper_id=%s
-AND freetext.property in (
+				SELECT property,text2item.item_id,revision_id,freetext.id AS freetext_id FROM text2item,freetext,revision,entry
+				WHERE text2item.text_id=freetext.text_id
+				AND text2item.group=%s
+				AND text2item.language IN ("",%s)
+				AND revision_id=revision.id
+				AND revision.entry_id=entry.id
+				AND entry.scraper_id=%s
+				AND freetext.property in (
 			""".replace("\n"," ").strip()
 			placeholders = ["%s" for props in props]
 			sql += ",".join(placeholders) + ")"
 			params = [group,language,scraper_id]+props
 			cursor.execute(sql, params)
 			return cursor.fetchall()
+
+	def get_old_revision_id_query(self,scraper_id: int):
+		sql = "SELECT revision.id FROM revision,entry WHERE entry.scraper_id="+str(scraper_id)+" AND revision.entry_id=entry.id AND revision.id!=entry.current_revision_id"
+		return sql
+
+	def clear_old_revisions_in_table(self,scraper_id: int,table: str):
+		sql = "DELETE FROM `"+table+"` WHERE `revision_id` IN ("+self.get_old_revision_id_query(scraper_id)+")"
+		with self.connection.cursor() as cursor:
+			cursor.execute(sql, ())
+			self.connection.commit()
+
+	def clear_old_revisions(self,scraper_id: int):
+		sql = self.get_old_revision_id_query(scraper_id)
+		ids = []
+		with self.connection.cursor() as cursor:
+			cursor.execute(sql, ())
+			rows = cursor.fetchall()
+			for row in rows:
+				ids.append(str(row[0]))
+		if len(ids)==0:
+			return
+		sql = "DELETE FROM `revision` WHERE `id` IN ("+",".join(ids)+")"
+		with self.connection.cursor() as cursor:
+			cursor.execute(sql, ())
+			self.connection.commit()
 
 	"""Returns the ID of the text, if it is in the `text` table.
 	Creates a new row if not, and returns the new ID.

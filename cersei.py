@@ -16,6 +16,9 @@ if __name__ == "__main__":
 	if sys.argv[1] == 'run':
 		scraper = get_scraper_from_id(sys.argv[2])
 		scraper.scrape_everything_via_index()
-	if sys.argv[1] == 'freetext2items':
+	elif sys.argv[1] == 'freetext2items':
 		scraper = get_scraper_from_id(sys.argv[2])
 		scraper.text2item_heuristic()
+	elif sys.argv[1] == 'clear_scraper_history':
+		scraper = get_scraper_from_id(sys.argv[2])
+		scraper.clear_old_revisions()

@@ -1,6 +1,7 @@
 import abc
-from src.tooldatabase import ToolDatabase
 import toolforge
+from src.tooldatabase import ToolDatabase
+from src.entry import Entry
 
 class ScraperBase(metaclass=abc.ABCMeta):
 	PROP2GROUP = {
@@ -32,9 +33,6 @@ class ScraperBase(metaclass=abc.ABCMeta):
 	def construct_entry_url_from_id(self,id):
 		"""Constructs the URL of the entry based on its ID"""
 
-	def string2item(self,prop,s):
-		pass
-
 	def get_db(self):
 		if self.db:
 			return self.db
@@ -47,17 +45,27 @@ class ScraperBase(metaclass=abc.ABCMeta):
 		return self.PROP2GROUP[prop]
 
 
-	def string2item(self,prop,s):
+	def string2item(self,prop,text):
 		db = self.get_db()
 		group = self.get_group_for_property(prop)
-		q = db.find_text_item_match(s,group,["",self.language])
+		q = db.find_text_item_match(text,group,["",self.language])
 		return q
+
+	def add_to_item_or_freetext(self,prop: str,text: str, entry: Entry):
+		text = text.strip()
+		if text=="":
+			return
+		item = self.string2item(prop,text)
+		if item is None:
+			entry.add_freetext(prop,text)
+		else:
+			entry.add_item(prop,item)
 
 	def scrape_everything_via_index(self):
 		db = self.get_db()
 		for html in self.paginate_index():
-			for o in self.parse_index_page(html):
-				o.create_or_update_in_database(db)
+			for entry in self.parse_index_page(html):
+				entry.create_or_update_in_database(db)
 		self.text2item_heuristic()
 
 	def place_heuristic(self,text):
@@ -157,10 +165,17 @@ class ScraperBase(metaclass=abc.ABCMeta):
 		for row in rows:
 			prop = "P"+str(row["property"])
 			if prop not in self.PROP2GROUP:
-				return
+				continue
 			group = self.PROP2GROUP[prop]
+			text = row["value"].decode('utf8')
 			if group=="place":
-				self.place_heuristic(row["value"].decode('utf8'))
+				self.place_heuristic(text)
 			if group=="occupation":
-				self.occupation_heuristic(row["value"].decode('utf8'))
+				self.occupation_heuristic(text)
 		self.convert_freetext_to_item()
+
+	def clear_old_revisions(self):
+		db = self.get_db()
+		for table in Entry.VALUE_TABLES:
+			db.clear_old_revisions_in_table(self.scraper_id,table)
+		db.clear_old_revisions(self.scraper_id)

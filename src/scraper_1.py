@@ -36,61 +36,53 @@ class Scraper1(ScraperBase):
 	def parse_index_page(self,html):
 		soup = BeautifulSoup(html,features="html.parser")
 		for div in soup.find_all('div', class_="result"):
-			o = Entry(self.scraper_id)
+			entry = Entry(self.scraper_id)
 			descs = []
+			has_birth_death_dates = False
 			for link in div.find_all('a', class_="result_name"):
 				original_label = link.get_text().strip()
 				pretty_label = original_label
 				pretty_label = re.sub(r'^.+? - +','',pretty_label)
 				pretty_label = re.sub(r' *\(.*$','',pretty_label)
 				pretty_label = re.sub(r'^(.+?), (.+)$',r'\2 \1',pretty_label)
-				o.add_label_etc(original_label,"original_label",self.language)
-				o.add_label_etc(pretty_label,"label",self.language)
+				entry.add_label_etc(original_label,"original_label",self.language)
+				entry.add_label_etc(pretty_label,"label",self.language)
 				href = link.get('href')
 				m = re.match(r"^.*docId=(\d+).*$",href)
 				if m:
-					o.id = m.group(1)
-					url = self.construct_entry_url_from_id(o.id)
-					o.add_label_etc(url,"url",self.language)
+					entry.id = m.group(1)
+					url = self.construct_entry_url_from_id(entry.id)
+					entry.add_label_etc(url,"url",self.language)
 			for span in div.find_all('span', class_="datumnarozeni"):
 				s = re.sub(r"\s+"," ",span.get_text()).strip()
-				self.parse_date_prop(o,s,"P569")
+				has_date = self.parse_date_prop(entry,s,"P569")
+				has_birth_death_dates = has_birth_death_dates or has_date
 				descs.append(s)
 			for span in div.find_all('span', class_="mistonarozeni"):
 				s = re.sub(r"\s+"," ",span.get_text()).strip()
-				if s=="":
-					continue
-				prop = "P19"
-				item = self.string2item(prop,s)
-				if item is None:
-					o.add_freetext(prop,s)
-				else:
-					o.add_item(prop,item)
+				self.add_to_item_or_freetext("P19",s,entry)
 				descs.append(s)
 			for span in div.find_all('span', class_="datumumrti"):
 				s = re.sub(r"\s+"," ",span.get_text()).strip()
-				self.parse_date_prop(o,s,"P570")
+				has_date = self.parse_date_prop(entry,s,"P570")
+				has_birth_death_dates = has_birth_death_dates or has_date
 				descs.append(s)
 			for span in div.find_all('span', class_="mistoumrti"):
 				s = re.sub(r"\s+"," ",span.get_text()).strip()
-				if s=="":
-					continue
-				prop = "P20"
-				item = self.string2item(prop,s)
-				if item is None:
-					o.add_freetext(prop,s)
-				else:
-					o.add_item(prop,item)
+				self.add_to_item_or_freetext("P20",s,entry)
 				descs.append(s)
 			descs_no_empty = filter(lambda d: d.strip()!="", descs)
-			o.short_description = "; ".join(descs_no_empty)
-			if o.is_valid():
-				yield o
+			short_description = "; ".join(descs_no_empty)
+			entry.add_label_etc(short_description,"description",self.language)
+			if has_birth_death_dates:
+				entry.add_item("P31","Q5")
+			if entry.is_valid():
+				yield entry
 
-	def parse_date_prop(self,o,date_string,prop):
+	def parse_date_prop(self,entry,date_string,prop):
 		date_string = date_string.strip()
 		if date_string=="":
-			return
+			return False
 		try:
 			m = re.match(r"^[*†]\D*(\d{1,2})\. *(\d{1,2})\. *(\d{3,4})",date_string)
 			if m:
@@ -98,9 +90,11 @@ class Scraper1(ScraperBase):
 				month = int(m.group(2))
 				year = int(m.group(3))
 				tv = TimeValue(ymd=(year, month, day), precision=11)
-				o.add_time(prop,tv)
+				entry.add_time(prop,tv)
+				return True
 			else: # Couldn't parse date
-				o.add_freetext(prop,date_string)
+				entry.add_freetext(prop,date_string)
+				return False
 		except: # Couldn't parse date
-			o.add_freetext(prop,date_string)
-
+			entry.add_freetext(prop,date_string)
+			return False
