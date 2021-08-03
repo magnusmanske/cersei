@@ -2,6 +2,9 @@ import abc
 import toolforge
 from src.tooldatabase import ToolDatabase
 from src.entry import Entry
+from src.values import TimeValue
+import datetime
+import requests
 
 class ScraperBase(metaclass=abc.ABCMeta):
 	PROP2GROUP = {
@@ -10,28 +13,60 @@ class ScraperBase(metaclass=abc.ABCMeta):
 		"P106":"occupation",
 	}
 
-	def __init__(self):
+	def __init__(self,scraper_id=None):
 		self.enforce_unique_ids = True
-		self.url_pattern = ''
-		self.scraper_id = None
+		self.name = None
+		self.url = None
+		self.url_pattern = None
+		self.scraper_id = scraper_id
+		self.language = None
 		self.db = None
 		self.dbwd = None
+		self.date_patterns = []
+		if scraper_id is not None:
+			self.load_scraper_from_db(scraper_id)
 
-	@abc.abstractmethod
+	"""Returns the HTML of every index page"""
 	def paginate_index(self):
-		"""Returns the HTML of every index page"""
+		raise Exception ("ScraperBase::paginate_index should be overloaded")
 
-	@abc.abstractmethod
+	"""Extends the given relative URL to a full, valid URL"""
 	def entry_url_relative2full(self,url):
-		"""Extends the given relative URL to a full, valid URL"""
+		raise Exception ("ScraperBase::entry_url_relative2full should be overloaded")
 
-	@abc.abstractmethod
+	"""Parses the index page HTML into individual entries"""
 	def parse_index_page(self,html):
-		"""Parses the index page HTML into individual entries"""
+		raise Exception ("ScraperBase::parse_index_page should be overloaded")
 
 	@abc.abstractmethod
+	def scrape_everything(self):
+		"""Scrapes the entire website"""
+
+	def is_entry_page(self,url,html=None,soup=None):
+		raise Exception ("ScraperBase::is_entry_page should be overloaded")
+
+	def get_entry_id_from_href(self,href):
+		raise Exception ("ScraperBase::get_entry_id_from_href should be overloaded")
+
+	def links_to_follow(self,soup):
+		raise Exception ("ScraperBase::links_to_follow should be overloaded")
+
+	"""Constructs the URL of the entry based on its ID"""
 	def construct_entry_url_from_id(self,id):
-		"""Constructs the URL of the entry based on its ID"""
+		if self.url_pattern is None:
+			return ""
+		return self.url_pattern.replace('$1',id)
+
+	def load_scraper_from_db(self,scraper_id):
+		self.scraper_id = scraper_id
+		db = self.get_db()
+		row = db.get_single_row_for_id("scraper",scraper_id)
+		if row is None:
+			raise Exception("There is no scraper with ID "+str(scraper_id))
+		self.name = row["name"]
+		self.url = row["url"]
+		self.url_pattern = row["url_pattern"]
+		self.language = row["language"]
 
 	def get_db(self):
 		if self.db:
@@ -44,6 +79,10 @@ class ScraperBase(metaclass=abc.ABCMeta):
 			return
 		return self.PROP2GROUP[prop]
 
+	def add_description_list(self,descs,entry):
+		descs_no_empty = filter(lambda d: d.strip()!="", descs)
+		short_description = "; ".join(descs_no_empty)
+		entry.add_label_etc(short_description,"description",self.language)
 
 	def string2item(self,prop,text):
 		db = self.get_db()
@@ -154,7 +193,6 @@ class ScraperBase(metaclass=abc.ABCMeta):
 			db.insert_group("item",columns,rows2db)
 			db.delete_rows_by_id("freetext",freetext2delete)
 
-
 	def text2item_heuristic(self):
 		if self.scraper_id is None:
 			return
@@ -179,3 +217,87 @@ class ScraperBase(metaclass=abc.ABCMeta):
 		for table in Entry.VALUE_TABLES:
 			db.clear_old_revisions_in_table(self.scraper_id,table)
 		db.clear_old_revisions(self.scraper_id)
+
+
+	def scrape_everything_via_follow(self,seed_urls):
+		running = seed_urls
+		url_cache = running[:]
+		while len(running)>0:
+			next_up = []
+			for url in running:
+				page = requests.get(url)
+				html = page.text
+				soup = BeautifulSoup(html,features="html.parser")
+
+				# Process this as an entry?
+				if self.is_entry_page(url,html,soup):
+					yield url,html,soup
+
+				# Find links to other encyclopedia pages
+				for link in self.links_to_follow(soup):
+					href = link.get('href')
+					if href is None:
+						continue
+					entry_id = self.get_entry_id_from_href(href)
+					url = self.construct_entry_url_from_id(entry_id)
+					if url in url_cache:
+						continue
+					next_up.append(url)
+					url_cache.append(url)
+			running = next_up
+
+	def scrape_mediawiki(self,api_url,batch_size=500):
+		# Get page URL pattern
+		url = api_url+"?action=query&meta=siteinfo&siprop=general&format=json"
+		response = requests.get(url)
+		j = response.json()
+		article_pattern = j["query"]["general"]["server"]+j["query"]["general"]["articlepath"]
+		if article_pattern.startswith("/"):
+			if api_url.startswith("https:"):
+				article_pattern = "https:"+article_pattern
+			else:
+				article_pattern = "http:"+article_pattern
+
+		# Retrieve all namespace 0 pages
+		apcontinue = None
+		while True:
+			url = api_url+"?action=query&list=allpages&apnamespace=0&format=json&apfilterredir=nonredirects&aplimit="+str(batch_size)
+			if apcontinue is not None:
+				url += "&apcontinue="+str(apcontinue)
+			try:
+				response = requests.get(url)
+				j = response.json()
+			except:
+				break # Some issue, can't continue
+			for pageinfo in j["query"]["allpages"]:
+				page_title = pageinfo["title"]
+				page_url = article_pattern.replace("$1",page_title.replace(" ","_"))
+				yield page_title,page_url
+			if "continue" in j and "apcontinue" in j["continue"]:
+				apcontinue = j["continue"]["apcontinue"]
+			else:
+				break # Can't continue
+
+	def add_date_or_freetext(self,prop,date_string,entry):
+		if len(self.date_patterns)==0:
+			raise Exception("add_date_or_freetext is used but no date_patterns are set")
+		date_string = str(date_string).strip()
+		for date_pattern,precision in self.date_patterns:
+			try:
+				dt = datetime.datetime.strptime(date_string,date_pattern)
+			except:
+				continue
+			if dt is None:
+				continue
+			if precision==11:
+				tv = TimeValue(ymd=(dt.year, dt.month, dt.day), precision=precision)
+			elif precision==10:
+				tv = TimeValue(ymd=(dt.year, dt.month, 1), precision=precision)
+			elif precision==9:
+				tv = TimeValue(ymd=(dt.year, 1, 1), precision=precision)
+			else:
+				continue
+			entry.add_time(prop,tv)
+			return True
+		entry.add_freetext(prop,date_string)
+		return False

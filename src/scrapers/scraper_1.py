@@ -10,10 +10,10 @@ class Scraper1(ScraperBase):
 	"""Slovnikceske Literatury CZ
 	"""
 	def __init__(self):
-		super().__init__()
-		self.scraper_id = 1
-		self.url_pattern = "http://www.slovnikceskeliteratury.cz/showContent.jsp?docId=$1"
-		self.language = 'cs'
+		super().__init__(1)
+
+	def scrape_everything(self):
+		self.scrape_everything_via_index()
 
 	def paginate_index(self):
 		pageNr = 1
@@ -27,9 +27,6 @@ class Scraper1(ScraperBase):
 				break # No "next" button, quit
 			pageNr += 1
 
-	def construct_entry_url_from_id(self,id):
-		return self.url_pattern.replace('$1',id)
-
 	def entry_url_relative2full(self,url):
 		return re.sub(r'^\./showContent\.jsp','http://www.slovnikceskeliteratury.cz/showContent.jsp',url)
 
@@ -38,7 +35,7 @@ class Scraper1(ScraperBase):
 		for div in soup.find_all('div', class_="result"):
 			entry = Entry(self.scraper_id)
 			descs = []
-			has_birth_death_dates = False
+			is_human = False
 			for link in div.find_all('a', class_="result_name"):
 				original_label = link.get_text().strip()
 				pretty_label = original_label
@@ -48,15 +45,16 @@ class Scraper1(ScraperBase):
 				entry.add_label_etc(original_label,"original_label",self.language)
 				entry.add_label_etc(pretty_label,"label",self.language)
 				href = link.get('href')
-				m = re.match(r"^.*docId=(\d+).*$",href)
-				if m:
-					entry.id = m.group(1)
-					url = self.construct_entry_url_from_id(entry.id)
-					entry.add_label_etc(url,"url",self.language)
+				if href is not None:
+					m = re.match(r"^.*docId=(\d+).*$",href)
+					if m:
+						entry.id = m.group(1)
+						url = self.construct_entry_url_from_id(entry.id)
+						entry.add_label_etc(url,"url",self.language)
 			for span in div.find_all('span', class_="datumnarozeni"):
 				s = re.sub(r"\s+"," ",span.get_text()).strip()
-				has_date = self.parse_date_prop(entry,s,"P569")
-				has_birth_death_dates = has_birth_death_dates or has_date
+				if self.parse_date_prop(entry,s,"P569"):
+					is_human = True
 				descs.append(s)
 			for span in div.find_all('span', class_="mistonarozeni"):
 				s = re.sub(r"\s+"," ",span.get_text()).strip()
@@ -64,17 +62,15 @@ class Scraper1(ScraperBase):
 				descs.append(s)
 			for span in div.find_all('span', class_="datumumrti"):
 				s = re.sub(r"\s+"," ",span.get_text()).strip()
-				has_date = self.parse_date_prop(entry,s,"P570")
-				has_birth_death_dates = has_birth_death_dates or has_date
+				if self.parse_date_prop(entry,s,"P570"):
+					is_human = True
 				descs.append(s)
 			for span in div.find_all('span', class_="mistoumrti"):
 				s = re.sub(r"\s+"," ",span.get_text()).strip()
 				self.add_to_item_or_freetext("P20",s,entry)
 				descs.append(s)
-			descs_no_empty = filter(lambda d: d.strip()!="", descs)
-			short_description = "; ".join(descs_no_empty)
-			entry.add_label_etc(short_description,"description",self.language)
-			if has_birth_death_dates:
+			self.add_description_list(descs,entry)
+			if is_human:
 				entry.add_item("P31","Q5")
 			if entry.is_valid():
 				yield entry

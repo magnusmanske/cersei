@@ -139,6 +139,14 @@ class ToolDatabase :
 			cursor.execute(sql, ())
 			self.connection.commit()
 
+	def get_single_row_for_id(self,table,row_id):
+		with self.connection.cursor(pymysql.cursors.DictCursor) as cursor:
+			sql = "SELECT * FROM `"+table+"` WHERE `id`=%s"
+			cursor.execute(sql, (row_id,))
+			rows = cursor.fetchall()
+			if rows is not None and len(rows)>0:
+				return rows[0]
+
 	"""Returns the ID of the text, if it is in the `text` table.
 	Creates a new row if not, and returns the new ID.
 	"""

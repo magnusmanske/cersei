@@ -45,7 +45,7 @@ class Entry:
 				continue
 			ret += key+":\n"
 			for item in values:
-				ret += str(item)
+				ret += "  "+str(item)+"\n"
 		return ret
 
 	def load_from_revision(self,db,revision_id):
@@ -132,6 +132,8 @@ class Entry:
 			return
 		if language is None or language.strip()=="":
 			return
+		if len(value)>250:
+			value = value[0:250]
 		v = LabelsEtcValue(value,type_name,language)
 		self.values["labels_etc"].append(PropertyValue(0,v))
 
