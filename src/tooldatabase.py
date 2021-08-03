@@ -2,6 +2,12 @@ import pymysql
 import toolforge
 
 class ToolDatabase :
+	LETTER2TYPE = {
+		"Q":"item",
+		"P":"property",
+		"L":"lexeme"
+	}
+
 	def __init__(self):
 		self.connection = toolforge.toolsdb("s54821__cersei_p")
 
@@ -146,6 +152,92 @@ class ToolDatabase :
 			rows = cursor.fetchall()
 			if rows is not None and len(rows)>0:
 				return rows[0]
+
+	"""Finds all source IDs in a list that are not in the database for this scraper.
+	Takes a dict (source_id,something).
+	Returns a list of all source IDs not in the database for this scraper.
+	"""
+	def source_ids_in_wikidata_but_not_here(self,scraper_id: int,source2wiki: dict)->list:
+		with self.connection.cursor(pymysql.cursors.DictCursor) as cursor:
+			all_source_ids = {}
+			for source_id in source2wiki.keys():
+				all_source_ids[str(source_id)] = True
+
+			placeholders = ["%s" for x in source2wiki.keys()]
+			sql = "SELECT `source_id` FROM `vw_entry` WHERE `scraper_id`=%s AND source_id IN ("+",".join(placeholders)+")"
+			params = [scraper_id]+list(source2wiki.keys())
+			cursor.execute(sql, params)
+			rows = cursor.fetchall()
+
+			for row in rows:
+				source_id = row["source_id"].decode('utf8')
+				if source_id in all_source_ids:
+					all_source_ids.pop(source_id)
+
+			return list(all_source_ids.keys())
+
+	def get_wikidata_mappings_for_source_ids(self,scraper_id,source_ids):
+		with self.connection.cursor(pymysql.cursors.DictCursor) as cursor:
+			placeholders = ["%s" for x in source_ids]
+			sql = """
+				SELECT `entry`.`id` AS `entry_id`,`text`.`value` AS `source_id`,`wikidata_mapping`.* FROM `entry`,`text`,`wikidata_mapping`
+				WHERE `entry`.`scraper_id`=%s
+				AND `entry`.`source_text_id`=`text`.`id`
+				AND `wikidata_mapping`.`entry_id`=`entry`.`id`
+				AND `text`.`value` IN (
+				""".replace("\n"," ").strip()+",".join(placeholders)+")"
+			params = [scraper_id]+list(source_ids)
+			cursor.execute(sql, params)
+			rows = cursor.fetchall()
+			ret = {}
+			for row in rows:
+				row["source_id"] = row["source_id"].decode('utf8')
+				row["item"] = self.construct_item(row["item_type"],row["item_id"])
+				ret[row["source_id"]] = row
+			return ret
+
+	def construct_item(self,item_type,item_id):
+		for letter,key in self.LETTER2TYPE.items():
+			if item_type==key:
+				return letter+str(item_id)
+		raise Exception("ToolDatabase::construct_item: Unknown item type '"+item_type+"'")
+
+	"""Splits an item into ajn item type string and a numeric value.
+	Eg: Q12345 => ("item",12345)
+	"""
+	def split_item(self,item):
+		item = str(item).strip().upper()
+		letter = item[0]
+		if letter not in self.LETTER2TYPE:
+			raise Exception("ToolDatabase::split_item: '"+item+"' has unknown letter")
+		item_id = item[1:]
+		if not item_id.isnumeric():
+			raise Exception("ToolDatabase::split_item: '"+item+"' has non-numeric part")
+		return (self.LETTER2TYPE[letter],int(item_id))
+
+	def get_entry_ids_for_source_ids(self,scraper_id,source_ids):
+		with self.connection.cursor(pymysql.cursors.DictCursor) as cursor:
+			placeholders = ["%s" for x in source_ids]
+			sql = """
+				SELECT `entry`.`id` AS `entry_id`,`text`.`value` AS `source_id` FROM `entry`,`text`
+				WHERE `entry`.`scraper_id`=%s
+				AND `entry`.`source_text_id`=`text`.`id`
+				AND `text`.`value` IN (
+				""".replace("\n"," ").strip()+",".join(placeholders)+")"
+			params = [scraper_id]+list(source_ids)
+			cursor.execute(sql, params)
+			rows = cursor.fetchall()
+			ret = {}
+			for row in rows:
+				ret[row["source_id"].decode('utf8')] = int(row["entry_id"])
+			return ret
+
+	def add_wikidata_mapping(self,entry_id,item,method):
+		item_type,item_id = self.split_item(item)
+		with self.connection.cursor() as cursor:
+			sql = "REPLACE INTO `wikidata_mapping` (`entry_id`,`item_type`,`item_id`,`method`) VALUES (%s,%s,%s,%s)"
+			cursor.execute(sql, (entry_id,item_type,item_id,method))
+			self.connection.commit()
 
 	"""Returns the ID of the text, if it is in the `text` table.
 	Creates a new row if not, and returns the new ID.

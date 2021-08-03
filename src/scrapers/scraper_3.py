@@ -76,3 +76,5 @@ class Scraper3(ScraperBase):
 		if entry.is_valid():
 			return entry
 
+	def normalize_source_id(self,source_id):
+		return source_id.replace(" ","_")

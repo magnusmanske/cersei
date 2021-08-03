@@ -22,3 +22,6 @@ if __name__ == "__main__":
 	elif sys.argv[1] == 'clear_scraper_history':
 		scraper = get_scraper_from_id(sys.argv[2])
 		scraper.clear_old_revisions()
+	elif sys.argv[1] == 'update_from_wikidata':
+		scraper = get_scraper_from_id(sys.argv[2])
+		scraper.update_from_wikidata()

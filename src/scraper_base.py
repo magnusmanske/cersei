@@ -1,3 +1,4 @@
+import re
 import abc
 import toolforge
 from src.tooldatabase import ToolDatabase
@@ -20,6 +21,7 @@ class ScraperBase(metaclass=abc.ABCMeta):
 		self.url_pattern = None
 		self.scraper_id = scraper_id
 		self.language = None
+		self.property = None
 		self.db = None
 		self.dbwd = None
 		self.date_patterns = []
@@ -64,9 +66,13 @@ class ScraperBase(metaclass=abc.ABCMeta):
 		if row is None:
 			raise Exception("There is no scraper with ID "+str(scraper_id))
 		self.name = row["name"]
+		self.property = row["property"]
 		self.url = row["url"]
 		self.url_pattern = row["url_pattern"]
 		self.language = row["language"]
+
+	def normalize_source_id(self,source_id):
+		return source_id
 
 	def get_db(self):
 		if self.db:
@@ -301,3 +307,46 @@ class ScraperBase(metaclass=abc.ABCMeta):
 			return True
 		entry.add_freetext(prop,date_string)
 		return False
+
+	def update_from_wikidata(self):
+		if self.property is None:
+			raise Exception("Scraper has not Wikidata property associated")
+		prop = "P"+str(self.property)
+		url = "https://query.wikidata.org/sparql?query=SELECT%20%3Fq%20%3Fvalue%20%7B%20%3Fq%20wdt%3A"+prop+"%20%3Fvalue%20%7D&format=json"
+		response = requests.get(url)
+		j = response.json()
+		source2wiki = {}
+		for x in j["results"]["bindings"]:
+			url = x["q"]["value"]
+			item = re.sub(r'^.+/','',url)
+			source_id = self.normalize_source_id(x["value"]["value"])
+			source2wiki[source_id] = item
+
+		# Get source IDs from Wikidata not in here, and remove from dict
+		db = self.get_db()
+		ids_not_here = db.source_ids_in_wikidata_but_not_here(self.scraper_id,source2wiki)
+		if len(ids_not_here)>0:
+			print ("Source IDs in Wikidata but not here:")
+			for source_id in ids_not_here:
+				print ("'"+source_id+"' => "+source2wiki[source_id])
+				source2wiki.pop(source_id)
+
+		source2map = db.get_wikidata_mappings_for_source_ids(self.scraper_id,list(source2wiki.keys()))
+		for source_id,data in source2map.items():
+			if data["method"]=="wikidata" and data["item"]==source2wiki[source_id]:
+				source2wiki.pop(source_id)
+				continue
+			db.delete_rows_by_id("wikidata_mapping",[data["id"]])
+			db.add_wikidata_mapping(data["entry_id"],source2wiki[source_id],"wikidata")
+			source2wiki.pop(source_id)
+
+		# Check if there are new ones left to add
+		if len(source2wiki)==0:
+			return
+
+		source2entry = db.get_entry_ids_for_source_ids(self.scraper_id,list(source2wiki.keys()))
+		for source_id,item in source2wiki.items():
+			if source_id not in source2entry:
+				continue
+			entry_id = source2entry[source_id]
+			db.add_wikidata_mapping(entry_id,item,"wikidata")
