@@ -19,9 +19,18 @@ class Scraper3(ScraperBase):
 
 	def scrape_everything(self):
 		db = self.get_db()
-		for title,url in self.scrape_mediawiki(self.url.rstrip("/")+"/api.php"):
+		for title,url in self.scrape_mediawiki_all(self.url.rstrip("/")+"/api.php"):
 			entry = self.extract_from_entry_page(title,url)
 			if entry is not None:
+				entry.create_or_update_in_database(db)
+		self.text2item_heuristic()
+
+	def scrape_new_entries(self):
+		db = self.get_db()
+		for title,url in self.scrape_mediawiki_new(self.url.rstrip("/")+"/api.php"):
+			entry = self.extract_from_entry_page(title,url)
+			if entry is not None:
+				print (str(entry))
 				entry.create_or_update_in_database(db)
 		self.text2item_heuristic()
 

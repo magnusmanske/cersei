@@ -44,6 +44,10 @@ class ScraperBase(metaclass=abc.ABCMeta):
 	def scrape_everything(self):
 		"""Scrapes the entire website"""
 
+	"""Scrapes new entries, if possible"""
+	def scrape_new_entries(self):
+		pass
+
 	def is_entry_page(self,url,html=None,soup=None):
 		raise Exception ("ScraperBase::is_entry_page should be overloaded")
 
@@ -71,10 +75,13 @@ class ScraperBase(metaclass=abc.ABCMeta):
 		self.url_pattern = row["url_pattern"]
 		self.language = row["language"]
 
+	"""Overload this to enforce rules for source IDs, eg underscores instead of spaces.
+	"""
 	def normalize_source_id(self,source_id):
 		return source_id
 
-	def get_db(self):
+	"""Returns a ToolDatabase object."""
+	def get_db(self)->ToolDatabase:
 		if self.db:
 			return self.db
 		self.db = ToolDatabase()
@@ -252,8 +259,16 @@ class ScraperBase(metaclass=abc.ABCMeta):
 					url_cache.append(url)
 			running = next_up
 
-	def scrape_mediawiki(self,api_url,batch_size=500):
-		# Get page URL pattern
+	def is_scraper_running(self):
+		last_start = self.get_db().get_last_event(["begin_scrape","begin_scrape_new"],self.scraper_id)
+		last_end = self.get_db().get_last_event(["end_scrape","end_scrape_new"],self.scraper_id)
+		if last_start is None:
+			return False # Never started
+		if last_end is None:
+			return True # Started, but never ended
+		return last_start>last_end
+
+	def get_mediawiki_article_pattern(self,api_url):
 		url = api_url+"?action=query&meta=siteinfo&siprop=general&format=json"
 		response = requests.get(url)
 		j = response.json()
@@ -263,26 +278,47 @@ class ScraperBase(metaclass=abc.ABCMeta):
 				article_pattern = "https:"+article_pattern
 			else:
 				article_pattern = "http:"+article_pattern
+		return article_pattern
 
-		# Retrieve all namespace 0 pages
-		apcontinue = None
+	"""Scrapes all pages in namespace 0 from the MediaWiki instance."""
+	def scrape_mediawiki_all(self,api_url,batch_size=500):
+		continue_parameter = "apcontinue"
+		query_result_key = "allpages"
+		api_params = "?action=query&list=allpages&apnamespace=0&format=json&apfilterredir=nonredirects&aplimit="+str(batch_size)
+		for ret in self.scrape_mediawiki_bespoke(api_url,continue_parameter,query_result_key,api_params):
+			yield ret
+
+	def scrape_mediawiki_new(self,api_url,batch_size=500):
+		event = self.get_db().get_last_event(["begin_scrape","begin_scrape_new"],self.scraper_id)
+		timestamp_until = event["timestamp"].strftime("%Y%m%d%H%M%S")
+
+		continue_parameter = "lecontinue"
+		query_result_key = "logevents"
+		api_params = "?action=query&list=logevents&letype=create&lenamespace=0&format=json&leend="+str(timestamp_until)+"&lelimit="+str(batch_size)
+		for ret in self.scrape_mediawiki_bespoke(api_url,continue_parameter,query_result_key,api_params):
+			yield ret
+
+	def scrape_mediawiki_bespoke(self,api_url,continue_parameter,query_result_key,api_params):
+		article_pattern = self.get_mediawiki_article_pattern(api_url)
+		continue_from = None
 		while True:
-			url = api_url+"?action=query&list=allpages&apnamespace=0&format=json&apfilterredir=nonredirects&aplimit="+str(batch_size)
-			if apcontinue is not None:
-				url += "&apcontinue="+str(apcontinue)
+			url = api_url+api_params
+			if continue_from is not None:
+				url += "&"+continue_parameter+"="+str(continue_from)
 			try:
 				response = requests.get(url)
 				j = response.json()
 			except:
-				break # Some issue, can't continue
-			for pageinfo in j["query"]["allpages"]:
+				print ("scrape_mediawiki_bespoke: Error retrieving or parsing "+url)
+				return # Some issue, can't continue
+			for pageinfo in j["query"][query_result_key]:
 				page_title = pageinfo["title"]
 				page_url = article_pattern.replace("$1",page_title.replace(" ","_"))
 				yield page_title,page_url
-			if "continue" in j and "apcontinue" in j["continue"]:
-				apcontinue = j["continue"]["apcontinue"]
+			if "continue" in j and continue_parameter in j["continue"]:
+				continue_from = j["continue"][continue_parameter]
 			else:
-				break # Can't continue
+				return # Can't continue
 
 	def add_date_or_freetext(self,prop,date_string,entry):
 		if len(self.date_patterns)==0:

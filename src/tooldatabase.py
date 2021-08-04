@@ -232,6 +232,30 @@ class ToolDatabase :
 				ret[row["source_id"].decode('utf8')] = int(row["entry_id"])
 			return ret
 
+	def add_log(self,event_type,relevant_id=0):
+		with self.connection.cursor() as cursor:
+			sql = "INSERT IGNORE INTO `event_log` (`event_type`,`relevant_id`) VALUES (%s,%s)"
+			cursor.execute(sql, (event_type,relevant_id))
+			self.connection.commit()
+
+	"""Finds the last event recorded for an event type(str), or a list of event types.
+	Optionally limits the events to a relevant_id (eg last scrape for a scraper_id).
+	Returns the latest matching row.
+	"""
+	def get_last_event(self,event_types,relevant_id=None):
+		if isinstance(event_types,str):
+			event_types = [event_types]
+		with self.connection.cursor(pymysql.cursors.DictCursor) as cursor:
+			placeholders = ["%s" for x in event_types]
+			params = event_types[:]
+			sql = "SELECT * FROM `event_log` WHERE `event_type` IN ("+",".join(placeholders)+")"
+			if relevant_id is not None:
+				sql += " AND `relevant_id`=%s"
+				params.append(relevant_id)
+			sql += " ORDER BY `timestamp` DESC LIMIT 1"
+			cursor.execute(sql, params)
+			return cursor.fetchone()
+
 	def add_wikidata_mapping(self,entry_id,item,method):
 		item_type,item_id = self.split_item(item)
 		with self.connection.cursor() as cursor:
