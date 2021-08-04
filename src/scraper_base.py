@@ -116,8 +116,11 @@ class ScraperBase(metaclass=abc.ABCMeta):
 	def scrape_everything_via_index(self):
 		db = self.get_db()
 		for html in self.paginate_index():
-			for entry in self.parse_index_page(html):
-				entry.create_or_update_in_database(db)
+			try:
+				for entry in self.parse_index_page(html):
+					entry.create_or_update_in_database(db)
+			except:
+				pass
 		self.text2item_heuristic()
 
 	def place_heuristic(self,text):
@@ -266,6 +269,8 @@ class ScraperBase(metaclass=abc.ABCMeta):
 			return False # Never started
 		if last_end is None:
 			return True # Started, but never ended
+		last_start = last_start["timestamp"]
+		last_end = last_end["timestamp"]
 		return last_start>last_end
 
 	def get_mediawiki_article_pattern(self,api_url):

@@ -13,17 +13,19 @@ def get_scraper_from_id(scraper_id):
 
 
 if __name__ == "__main__":
-	if sys.argv[1] == 'run':
+	if sys.argv[1] in['run','test']:
 		scraper = get_scraper_from_id(sys.argv[2])
 		if scraper.is_scraper_running():
 			print ("Scraper appears to be running")
 			exit(0)
-		scraper.get_db().add_log("begin_scrape",scraper.scraper_id)
+		if sys.argv[1]=="run":
+			scraper.get_db().add_log("begin_scrape",scraper.scraper_id)
 		try:
 			scraper.scrape_everything()
 		except:
 			pass
-		scraper.get_db().add_log("end_scrape",scraper.scraper_id)
+		if sys.argv[1]=="run":
+			scraper.get_db().add_log("end_scrape",scraper.scraper_id)
 	elif sys.argv[1] == 'new':
 		scraper = get_scraper_from_id(sys.argv[2])
 		if scraper.is_scraper_running():
