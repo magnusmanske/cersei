@@ -1,5 +1,6 @@
 import abc
 import datetime
+import enum
 
 class Value(metaclass=abc.ABCMeta):
 	@abc.abstractmethod
@@ -58,26 +59,26 @@ class FreetextValue(Value):
 		text_id = db.get_or_create_text(self.value)
 		return [text_id]
 
-class ItemValue(Value):
-	LETTER_TO_TYPE = {
-		"P":"property",
-		"Q":"item",
-		"L":"lexeme"
-	}
+class EntityLetterToType(str, enum.Enum):
+	P = "property"
+	Q = "item"
+	L = "lexeme"
 
+class ItemValue(Value):
 	def __init__(self, q):
 		super().__init__()
 		q = q.strip().upper()
 		if len(q) < 2:
 			raise Exception("ItemValue: "+q+" is too short")
 		letter = str(q[0])
-		if letter not in self.LETTER_TO_TYPE:
+		try:
+			self.item_type = EntityLetterToType[letter]
+		except:
 			raise Exception("ItemValue: "+q+" has unknown letter '"+letter+"'")
 		number_string = str(q[1:])
 		if not number_string.isnumeric():
 			raise Exception("ItemValue: "+number_string+" is not numeric")
 		self.item_id = int(number_string)
-		self.item_type = self.LETTER_TO_TYPE[letter]
 
 	def __str__(self):
 		return str(self.item_id)+" ("+self.item_type+")"
