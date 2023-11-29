@@ -1,12 +1,21 @@
+from collections import OrderedDict
 from src.values import *
+from src.wikidata_entity import *
+import json
 
 class PropertyValue:
 	def __init__(self, prop, value):
 		self.prop = prop
 		self.value = value
 
+	def as_wikidata_claim(self):
+		return self.value.as_wikidata_claim(self.property_text())
+
+	def property_text(self)->str:
+		return "P"+str(self.prop)
+
 	def __str__(self):
-		return "P"+str(self.prop)+":"+str(self.value)
+		return self.property_text()+":"+str(self.value)
 
 	def __lt__(self,other):
 		if self.prop < other.prop:
@@ -48,8 +57,11 @@ class Entry:
 				ret += "  "+str(item)+"\n"
 		return ret
 
+	def decode(self,s):
+		return s.decode(encoding='utf8',errors='ignore')
+
 	def load_from_revision(self,db,revision_id):
-		self.revision_id = revision_id
+		self.revision_id = int(revision_id)
 		for table,value in self.values.items():
 			if table in ["time","location"]:
 				query_table=table
@@ -60,7 +72,7 @@ class Entry:
 				continue
 			for row in rows:
 				if table=="string":
-					o = StringValue(row["value"].decode('utf8'))
+					o = StringValue(self.decode(row["value"]))
 				elif table=="item":
 					o = ItemValue(row["q"])
 				elif table=="time":
@@ -68,17 +80,69 @@ class Entry:
 				elif table=="location":
 					o = LocationValue(latitude=row["longitude"],longitude=row["longitude"])
 				elif table=="freetext":
-					o = FreetextValue(row["value"].decode('utf8'))
+					o = FreetextValue(self.decode(row["value"]))
 				elif table=="monolingual_string":
-					o = MonolingualStringValue(row["language"].decode('utf8'),row["value"].decode('utf8'))
+					o = MonolingualStringValue(self.decode(row["language"]),self.decode(row["value"]))
 				elif table=="labels_etc":
-					o = LabelsEtcValue(row["value"].decode('utf8'),row["type_name"],row["language"].decode('utf8'))
+					o = LabelsEtcValue(self.decode(row["value"]),row["type_name"],self.decode(row["language"]))
 				prop = 0
 				if "property" in row:
 					prop = int(row["property"])
 				self.values[table].append(PropertyValue(prop,o))
 
+	def dict_deep_sort(self,obj):
+	    if isinstance(obj, dict):
+	        obj = OrderedDict(sorted(obj.items()))
+	        for k, v in obj.items():
+	            if isinstance(v, dict) or isinstance(v, list):
+	                obj[k] = self.dict_deep_sort(v)
+
+	    if isinstance(obj, list):
+	        for i, v in enumerate(obj):
+	            if isinstance(v, dict) or isinstance(v, list):
+	                obj[i] = self.dict_deep_sort(v)
+	        obj = sorted(obj, key=lambda x: json.dumps(x))
+
+	    return obj
+
+	def as_json(self, internal_use: bool):
+		entity = WikidataEntity()
+		entity.entity_type = WikidataEntityType.ITEM
+
+		for table,values in self.values.items():
+			if table in ["labels_etc","freetext"]:
+				continue
+			for o in values:
+				entity.claims.append(o.as_wikidata_claim())
+
+		for property_value in self.values["labels_etc"]:
+			value = property_value.value
+			label = WikidataLabel(value.language,value.value)
+			if value.type_name=="label":
+				entity.labels.append(label)
+			elif value.type_name=="description":
+				entity.descriptions.append(label)
+			elif value.type_name=="original_label":
+				entity.aliases.append(label)
+			elif value.type_name=="alias":
+				entity.aliases.append(label)
+
+		j = entity.as_dict()
+		if internal_use:
+			# TODO add other stuff
+			j["freetext"] = []
+			for freetext in self.values["freetext"]:
+				label = {"property":freetext.property_text(),"value":str(freetext.value)}
+				j["freetext"].append(label)
+
+		j = self.dict_deep_sort(j)
+		return json.dumps(j)
+
 	def has_revision_changed(self,db):
+		json = entry.as_json(True)
+		json_other = db.get_revision_item(self.revision_id)
+		return (json!=json_other) # TODO test
+		"""
 		other = Entry(self.scraper_id)
 		other.load_from_revision(db,self.revision_id)
 		for table,value in self.values.items():
@@ -90,6 +154,7 @@ class Entry:
 				if row!=other_table[row_id]:
 					return True
 		return False
+		"""
 
 	def create_or_update_in_database(self,db):
 		self.check_valid()
@@ -99,6 +164,7 @@ class Entry:
 		if self.revision_id!=0 and not self.has_revision_changed(db):
 			return
 		self.revision_id = db.create_new_revision(self.entry_id)
+		db.set_revision_item(self.revision_id,self.as_json(True))
 		db.set_current_revision(self.entry_id,self.revision_id)
 
 		# Generate INSERT statements

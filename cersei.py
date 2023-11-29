@@ -2,6 +2,9 @@
 
 import sys
 import importlib
+import toolforge  # For oneoff TESTING FIXME
+from src.tooldatabase import ToolDatabase # For oneoff TESTING FIXME
+from src.entry import Entry # For oneoff TESTING FIXME
 
 def get_scraper_from_id(scraper_id):
 	module_name = "src.scrapers.scraper_"+str(scraper_id)
@@ -47,3 +50,19 @@ if __name__ == "__main__":
 	elif sys.argv[1] == 'update_from_wikidata':
 		scraper = get_scraper_from_id(sys.argv[2])
 		scraper.update_from_wikidata()
+	elif sys.argv[1] == 'fill_missing_revision_items':
+		db = ToolDatabase()
+		with db.connection.cursor() as cursor:
+			sql = "SELECT id,scraper_id,current_revision_id FROM entry WHERE current_revision_id NOT IN (SELECT revision_id FROM revision_item)"
+			cursor.execute(sql, [])
+			rows = cursor.fetchall()
+		for row in rows:
+			scraper_id = row[1]
+			revision_id = row[2]
+			entry = Entry(scraper_id)
+			entry.id = row[0]
+			entry.load_from_revision(db,revision_id)
+			json = entry.as_json(True)
+			db.set_revision_item(revision_id,json)
+
+

@@ -170,11 +170,26 @@ class ToolDatabase :
 			rows = cursor.fetchall()
 
 			for row in rows:
-				source_id = row["source_id"].decode('utf8')
+				source_id = row["source_id"].decode(encoding='utf8',errors='ignore')
 				if source_id in all_source_ids:
 					all_source_ids.pop(source_id)
 
 			return list(all_source_ids.keys())
+
+	def get_revision_item(self,revision_id):
+		with self.connection.cursor() as cursor:
+			sql = "SELECT `json` FROM `revision_item` WHERE `revision_id`=%s"
+			cursor.execute(sql, (str(revision_id)))
+			rows = cursor.fetchall()
+			if len(rows)==1:
+				return str(rows[0][0])
+
+	def set_revision_item(self,revision_id,json):
+		with self.connection.cursor() as cursor:
+			sql = "INSERT IGNORE INTO `revision_item` (`revision_id`,`json`) VALUES (%s,%s)"
+			cursor.execute(sql, (str(revision_id), str(json)))
+			self.connection.commit()
+
 
 	def get_wikidata_mappings_for_source_ids(self,scraper_id,source_ids):
 		with self.connection.cursor(pymysql.cursors.DictCursor) as cursor:
@@ -191,7 +206,7 @@ class ToolDatabase :
 			rows = cursor.fetchall()
 			ret = {}
 			for row in rows:
-				row["source_id"] = row["source_id"].decode('utf8')
+				row["source_id"] = row["source_id"].decode(encoding='utf8',errors='ignore')
 				row["item"] = self.construct_item(row["item_type"],row["item_id"])
 				ret[row["source_id"]] = row
 			return ret
@@ -229,7 +244,7 @@ class ToolDatabase :
 			rows = cursor.fetchall()
 			ret = {}
 			for row in rows:
-				ret[row["source_id"].decode('utf8')] = int(row["entry_id"])
+				ret[row["source_id"].decode(encoding='utf8',errors='ignore')] = int(row["entry_id"])
 			return ret
 
 	def add_log(self,event_type,relevant_id=0):
@@ -266,7 +281,7 @@ class ToolDatabase :
 	"""Returns the ID of the text, if it is in the `text` table.
 	Creates a new row if not, and returns the new ID.
 	"""
-	def get_or_create_text(self,value) -> int:
+	def get_or_create_text(self,value):
 		value = str(value).strip()
 		if value == "":
 			return None

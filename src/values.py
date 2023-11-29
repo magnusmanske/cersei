@@ -1,8 +1,13 @@
 import abc
 import datetime
 import enum
+from src.wikidata_entity import *
 
 class Value(metaclass=abc.ABCMeta):
+	def __init__(self):
+		self.qualifiers = []
+		self.references = []
+
 	@abc.abstractmethod
 	def db_table(self):
 		"""Returns the name of the database table coreesponding to the type."""
@@ -16,6 +21,13 @@ class Value(metaclass=abc.ABCMeta):
 		"""Returns the values for the database table in the same order as "fields()".
 		Requires db to query/create text values.
 		"""
+
+	@abc.abstractmethod
+	def as_wikidata_claim(self, prop):
+		"""Returns the value as a Wikidata claim"""
+
+	def add_references_qualifiers(self, claim):
+		return claim # TODO
 
 class StringValue(Value):
 	def __init__(self, value):
@@ -38,6 +50,9 @@ class StringValue(Value):
 		text_id = db.get_or_create_text(self.value)
 		return [text_id]
 
+	def as_wikidata_claim(self, prop):
+		return self.add_references_qualifiers(WikidataClaimString(prop,self.value))
+
 class FreetextValue(Value):
 	def __init__(self, value):
 		super().__init__()
@@ -58,6 +73,9 @@ class FreetextValue(Value):
 	def db_values(self, db):
 		text_id = db.get_or_create_text(self.value)
 		return [text_id]
+
+	def as_wikidata_claim(self, prop):
+		return self.add_references_qualifiers(WikidataClaimString(prop,self.value))
 
 class EntityLetterToType(str, enum.Enum):
 	P = "property"
@@ -97,6 +115,10 @@ class ItemValue(Value):
 	def db_values(self, db):
 		return [self.item_id,self.item_type]
 
+	def as_wikidata_claim(self, prop):
+		q = str(self.item_type.name)+str(self.item_id)
+		return self.add_references_qualifiers(WikidataClaimEntity(prop,q))
+
 class LabelsEtcValue(Value):
 	ALLOWED_TYPES = ('original_label','label','alias','description','url')
 
@@ -129,6 +151,8 @@ class LabelsEtcValue(Value):
 		text_id = db.get_or_create_text(self.value)
 		return [self.type_name,language_id,text_id]
 
+	def as_wikidata_claim(self, prop):
+		pass
 
 class MonolingualStringValue(Value):
 	def __init__(self, language, value):
@@ -154,6 +178,9 @@ class MonolingualStringValue(Value):
 		language_id = db.get_or_create_text(self.language)
 		text_id = db.get_or_create_text(self.value)
 		return [language_id,text_id]
+
+	def as_wikidata_claim(self, prop):
+		return self.add_references_qualifiers(WikidataClaimMonolingualText(prop,self.language,self.value))
 
 class TimeValue(Value):
 	def __init__(self, dt=None, ymd=None, precision=9, tv=None ):
@@ -187,6 +214,9 @@ class TimeValue(Value):
 	def db_values(self, db):
 		return [str(self.time_value),self.precision]
 
+	def as_wikidata_claim(self, prop):
+		return self.add_references_qualifiers(WikidataClaimTime(prop,self.time_value,self.precision))
+
 class LocationValue(Value):
 	def __init__(self, latitude: float, longitude: float):
 		super().__init__()
@@ -209,3 +239,6 @@ class LocationValue(Value):
 
 	def db_values(self, db):
 		return [self.latitude,self.longitude]
+
+	def as_wikidata_claim(self, prop):
+		return self.add_references_qualifiers(WikidataClaimLocation(prop,self.latitude,self.longitude))

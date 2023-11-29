@@ -113,6 +113,9 @@ class ScraperBase(metaclass=abc.ABCMeta):
 		else:
 			entry.add_item(prop,item)
 
+	def scrape_everything_via_datafile(self):
+		pass
+
 	def scrape_everything_via_index(self):
 		db = self.get_db()
 		for html in self.paginate_index():
@@ -163,7 +166,7 @@ class ScraperBase(metaclass=abc.ABCMeta):
 			rows = cursor.fetchall()
 			if len(rows)!=1:
 				return
-			item = rows[0][0].decode('utf8')
+			item = rows[0][0].decode(encoding='utf8',errors='ignore')
 			group = self.get_group_for_property(example_property)
 			if group is None: # Paranoia
 				return item
@@ -221,7 +224,7 @@ class ScraperBase(metaclass=abc.ABCMeta):
 			if prop not in self.PROP2GROUP:
 				continue
 			group = self.PROP2GROUP[prop]
-			text = row["value"].decode('utf8')
+			text = row["value"].decode(encoding='utf8',errors='ignore')
 			if group=="place":
 				self.place_heuristic(text)
 			if group=="occupation":
