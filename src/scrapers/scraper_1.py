@@ -16,9 +16,9 @@ class Scraper1(ScraperBase):
 		self.scrape_everything_via_index()
 
 	def paginate_index(self):
-		pageNr = 1
 		while True:
-			url = "http://www.slovnikceskeliteratury.cz/list.jsp?show=-&order=title&ascDesc=asc&startswith="
+			print (pageNr)
+			url = "http://slovnikceskeliteratury.cz/list.jsp?show=-&order=title&ascDesc=asc&startswith="
 			page = requests.post(url, data = {"page":1,"pageNr":pageNr})
 			html = page.text
 			yield html
@@ -40,7 +40,7 @@ class Scraper1(ScraperBase):
 				original_label = link.get_text().strip()
 				pretty_label = original_label
 				pretty_label = re.sub(r'^.+? - +','',pretty_label)
-				pretty_label = re.sub(r' *\(.*$','',pretty_label)
+				pretty_label = re.sub(r'\s*\(.*$','',pretty_label)
 				pretty_label = re.sub(r'^(.+?), (.+)$',r'\2 \1',pretty_label)
 				entry.add_label_etc(original_label,"original_label",self.language)
 				entry.add_label_etc(pretty_label,"label",self.language)
