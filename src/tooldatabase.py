@@ -1,3 +1,5 @@
+import json
+import re
 import pymysql
 import toolforge
 
@@ -309,3 +311,61 @@ class ToolDatabase :
 			cursor.execute(sql, values)
 			self.connection.commit()
 			return cursor.lastrowid
+
+
+
+	def prop2int(self,prop):
+		return int(re.sub(r'\D','',str(prop)))
+
+	def query_entries(self,j):
+		conditions = [f"`t0`.`current_revision_id`=`t1`.`revision_id`"]
+		tables = ['`vw_entry` AS `t0`','`revision_item` AS `t1`']
+		params = []
+
+		if "scraper_id" in j:
+			scraper_id = int(j['scraper_id'])
+			conditions.append(f"`t0`.`scraper_id`={scraper_id}")
+
+		if "links" in j:
+			for (prop,target) in j["links"]:
+				table = "t"+str(len(tables))
+				tables.append(f"`vw_item` AS `{table}`")
+				prop = self.prop2int(prop)
+				conditions.append(f" `t0`.`current_revision_id`=`{table}`.`revision_id` AND `{table}`.`property`={prop} AND `{table}`.`q`=%s")
+				params.append(target)
+
+		# if "has_properties" in j:
+		# 	for prop in j["has_properties"]:
+		# 		prop = self.prop2int(prop)
+		# 		conditions.append(f" `t0`.`current_revision_id`=`{table}`.`revision_id` AND `{table}`.`property`={prop}")
+
+		rev_created = '(SELECT `r0`.`created` FROM `revision` AS `r0` WHERE `r0`.`id`=`t0`.`current_revision_id`) AS `revision_created`'
+		sql = f"SELECT DISTINCT `t0`.*,{rev_created},`t1`.`json` AS `entry` FROM " + ",".join(tables) + " WHERE " + " AND ".join(conditions)
+
+		limit = 50
+		if "limit" in j:
+			limit = min(500,int(j['limit']))
+		sql += f" LIMIT {limit}"
+		if "offset" in j:
+			offset = int(j['offset'])
+			sql += f" OFFSET {offset}"
+
+		with self.connection.cursor() as cursor:
+			cursor.execute(sql, params)
+			self.connection.commit()
+			field_names = [i[0] for i in cursor.description]
+			rows = cursor.fetchall()
+		ret = []
+		for row in rows:
+			r = {}
+			for index in range(0,len(field_names)):
+				if field_names[index]=='entry':
+					r['entry'] = json.loads(row[index])
+				elif type(row[index]).__name__=='bytes':
+					r[field_names[index]] = row[index].decode("utf-8") 
+				elif type(row[index]).__name__=='datetime':
+					r[field_names[index]] = str(row[index]) # TODO better?
+				else:
+					r[field_names[index]] = row[index]
+			ret.append(r)
+		return ret

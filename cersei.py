@@ -2,6 +2,7 @@
 
 import sys
 import importlib
+import json # For test123
 import toolforge  # For oneoff TESTING FIXME
 from src.tooldatabase import ToolDatabase # For oneoff TESTING FIXME
 from src.entry import Entry # For oneoff TESTING FIXME
@@ -13,6 +14,8 @@ def get_scraper_from_id(scraper_id):
 	class_ = getattr(module, class_name)
 	scraper = class_()
 	return scraper
+
+
 
 
 if __name__ == "__main__":
@@ -64,5 +67,10 @@ if __name__ == "__main__":
 			entry.load_from_revision(db,revision_id)
 			json = entry.as_json(True)
 			db.set_revision_item(revision_id,json)
-
+	elif sys.argv[1] == 'test123':
+		s = """{"offset":0,"scraper_id":1,"links":[["P31","Q5"]]}"""
+		j = json.loads(s)
+		db = ToolDatabase()
+		ret = db.query_entries(j)
+		print(json.dumps(ret, indent=4, sort_keys=True))
 
