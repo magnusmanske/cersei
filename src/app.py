@@ -11,22 +11,29 @@ load_dotenv(dotenv_path)
 app = Flask(__name__)
 app.config["FLASK_ENV"] = "development"
 
-#whitelisted = ['project.query', 'maniphest.info']
+#whitelisted = ['entries.get']
 
 @app.route('/')
 def home():
     return Response("""
-YAY!
+YAY!7
     """.strip(), content_type='text/plain')
 
+@app.route('/api/get_entries/<conditions>')
+def query(conditions):
+    conditions = request.get_json(force=True)#json.loads(conditions)
+    data = { "test":"it works!!!", "conditions":conditions }
+    return json.dumps(data)
 
+"""
 @app.route('/api/<action>')
 def query(action):
     data = { "test":"it works!", "action":action}
+    if action=="get_entries"
     return json.dumps(data)
+"""
+
     """
-    if action not in whitelisted:
-        return json.dumps({'error': 'The %s action is not whitelisted' % action})
 
     params = request.form.get('data')
     if not params:
