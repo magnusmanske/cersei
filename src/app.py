@@ -43,7 +43,7 @@ def query_get_entries(conditions):
     except Exception as err:
         return jsonify({'status': f"Unexpected {err=}, {type(err)=}"})
 
-@app.route('/api.php')
+@app.route('/w/api.php')
 def query_api_php():
     action = request.args.get('action', default='', type=str)
     if action=='wbgetentities':

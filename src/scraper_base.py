@@ -394,3 +394,7 @@ class ScraperBase(metaclass=abc.ABCMeta):
 				continue
 			entry_id = source2entry[source_id]
 			db.add_wikidata_mapping(entry_id,item,"wikidata")
+
+	def get_data_file_path(self,filename: str):
+		return f"/data/project/cersei/data_files/{filename}"
+	

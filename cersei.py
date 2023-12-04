@@ -8,14 +8,16 @@ from src.tooldatabase import ToolDatabase # For oneoff TESTING FIXME
 from src.entry import Entry # For oneoff TESTING FIXME
 
 def get_scraper_from_id(scraper_id):
-	module_name = "src.scrapers.scraper_"+str(scraper_id)
-	class_name = "Scraper"+str(scraper_id)
-	module = importlib.import_module(module_name)
-	class_ = getattr(module, class_name)
-	scraper = class_()
-	return scraper
-
-
+	try:
+		module_name = "src.scrapers.scraper_"+str(scraper_id)
+		class_name = "Scraper"+str(scraper_id)
+		module = importlib.import_module(module_name)
+		class_ = getattr(module, class_name)
+		scraper = class_()
+		return scraper
+	except:
+		print(f"No or broken scraper found for #{scraper_id}")
+		exit(0)
 
 
 if __name__ == "__main__":
@@ -76,3 +78,12 @@ if __name__ == "__main__":
 		ret = db.get_entities([123,456])
 		print(json.dumps(ret, indent=4, sort_keys=True))
 
+
+""" Last scraper runtimes
+SELECT
+scraper.*,
+@start := (SELECT `timestamp` FROM event_log WHERE event_type LIKE "begin_scrape%" AND relevant_id=scraper.id ORDER BY `timestamp` DESC LIMIT 1) AS start_time,
+@end :=(SELECT `timestamp` FROM event_log WHERE event_type LIKE "end_scrape%" AND relevant_id=scraper.id ORDER BY `timestamp` DESC LIMIT 1) AS end_time,
+TIMESTAMPDIFF(SECOND,@start,@end) AS runtime_seconds
+FROM scraper
+"""
