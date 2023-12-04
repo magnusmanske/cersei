@@ -317,14 +317,64 @@ class ToolDatabase :
 	def prop2int(self,prop):
 		return int(re.sub(r'\D','',str(prop)))
 
+	def query_scrapers(self):
+		sql = 'SELECT scraper.*,(SELECT count(*) FROM entry WHERE entry.scraper_id=scraper.id) AS entries FROM scraper'
+		with self.connection.cursor() as cursor:
+			cursor.execute(sql, ())
+			self.connection.commit()
+			field_names = [i[0] for i in cursor.description]
+			rows = cursor.fetchall()
+		ret = []
+		for row in rows:
+			r = {}
+			for index in range(0,len(field_names)):
+				if type(row[index]).__name__=='bytes':
+					r[field_names[index]] = row[index].decode("utf-8") 
+				else:
+					r[field_names[index]] = row[index]
+			ret.append(r)
+		return ret
+
+	def get_entities(self, entry_ids):
+		ret = {}
+		if len(entry_ids)==0:
+			return ret
+		for n in range(len(entry_ids)):
+			entry_ids[n] = f"{entry_ids[n]}"
+		sql = "SELECT `entry`.`id`,`json`,`current_revision_id` FROM `entry`,`revision_item` WHERE `entry`.`current_revision_id`=`revision_item`.`revision_id` AND `entry`.`id` IN (" + ",".join(entry_ids) + ")"
+		with self.connection.cursor() as cursor:
+			cursor.execute(sql, [])
+			self.connection.commit()
+			rows = cursor.fetchall()
+		for row in rows:
+			entry_id = int(row[0])
+			j = json.loads(row[1])
+			j.pop('freetext', None)
+			j.pop('scraper_item', None)
+			j['id'] = f"C{entry_id}"
+			j['title'] = j['id']
+			j['lastrevid'] = row[2] # current_revision_id
+			j['pageid'] = entry_id
+			j["ns"] = 0
+			ret[j['id']] = j
+		return ret
+
 	def query_entries(self,j):
-		conditions = [f"`t0`.`current_revision_id`=`t1`.`revision_id`"]
-		tables = ['`vw_entry` AS `t0`','`revision_item` AS `t1`']
+		conditions = ["`t0`.`current_revision_id`=`t1`.`revision_id`","`t0`.`current_revision_id`=`t2`.`id`"]
+		tables = ['`vw_entry` AS `t0`','`revision_item` AS `t1`','`revision` AS `t2`']
 		params = []
 
 		if "scraper_id" in j:
 			scraper_id = int(j['scraper_id'])
 			conditions.append(f"`t0`.`scraper_id`={scraper_id}")
+
+		if "entry_since" in j:
+			conditions.append("`t0`.`created`>=%s")
+			params.append(str(j["entry_since"]))
+
+		if "revision_since" in j:
+			conditions.append("`t2`.`created`>=%s")
+			params.append(str(j["revision_since"]))
 
 		if "links" in j:
 			for (prop,target) in j["links"]:
@@ -339,8 +389,12 @@ class ToolDatabase :
 		# 		prop = self.prop2int(prop)
 		# 		conditions.append(f" `t0`.`current_revision_id`=`{table}`.`revision_id` AND `{table}`.`property`={prop}")
 
-		rev_created = '(SELECT `r0`.`created` FROM `revision` AS `r0` WHERE `r0`.`id`=`t0`.`current_revision_id`) AS `revision_created`'
-		sql = f"SELECT DISTINCT `t0`.*,{rev_created},`t1`.`json` AS `entry` FROM " + ",".join(tables) + " WHERE " + " AND ".join(conditions)
+		add_entry_json = "no_json" not in j
+
+		sql = "SELECT DISTINCT `t0`.*,`t2`.`created` AS `revision_created`"
+		if add_entry_json:
+			sql += ",`t1`.`json` AS `entry`"
+		sql += " FROM " + ",".join(tables) + " WHERE " + " AND ".join(conditions)
 
 		limit = 50
 		if "limit" in j:

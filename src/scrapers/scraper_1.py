@@ -16,15 +16,18 @@ class Scraper1(ScraperBase):
 		self.scrape_everything_via_index()
 
 	def paginate_index(self):
+		pageNr = 0
 		while True:
-			print (pageNr)
-			url = "http://slovnikceskeliteratury.cz/list.jsp?show=-&order=title&ascDesc=asc&startswith="
-			page = requests.post(url, data = {"page":1,"pageNr":pageNr})
-			html = page.text
-			yield html
-			soup = BeautifulSoup(html,features="html.parser")
-			if len(soup.find_all('input', attrs={"class": "submitButton", "name": "next"}))==0:
-				break # No "next" button, quit
+			try:
+				url = "http://slovnikceskeliteratury.cz/list.jsp?show=-&order=title&ascDesc=asc&startswith="
+				page = requests.post(url, data = {"page":1,"pageNr":pageNr})
+				html = page.text
+				yield html
+				soup = BeautifulSoup(html,features="html.parser")
+				if len(soup.find_all('input', attrs={"class": "submitButton", "name": "next"}))==0:
+					break # No "next" button, quit
+			except Exception as err:
+				print(f"Unexpected {err}")
 			pageNr += 1
 
 	def entry_url_relative2full(self,url):

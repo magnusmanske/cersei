@@ -68,9 +68,11 @@ if __name__ == "__main__":
 			json = entry.as_json(True)
 			db.set_revision_item(revision_id,json)
 	elif sys.argv[1] == 'test123':
-		s = """{"offset":0,"scraper_id":1,"links":[["P31","Q5"]]}"""
-		j = json.loads(s)
 		db = ToolDatabase()
-		ret = db.query_entries(j)
+		# s = """{"offset":0,"scraper_id":1,"links":[["P31","Q5"]]}"""
+		# j = json.loads(s)
+		#ret = db.query_entries(j)
+		#ret = db.query_scrapers()
+		ret = db.get_entities([123,456])
 		print(json.dumps(ret, indent=4, sort_keys=True))
 

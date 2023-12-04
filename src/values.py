@@ -77,6 +77,33 @@ class FreetextValue(Value):
 	def as_wikidata_claim(self, prop):
 		return self.add_references_qualifiers(WikidataClaimString(prop,self.value))
 
+class ScraperItemValue(Value):
+	def __init__(self, scraper_id: int, ext_id: str):
+		super().__init__()
+		self.scraper_id = scraper_id
+		self.ext_id = ext_id
+
+	def __str__(self):
+		return f"{self.scraper_id}:{self.ext_id}"
+
+	def __lt__(self,other):
+		if self.scraper_id==other.scraper_id:
+			return self.ext_id<other.ext_id
+		return self.scraper_id<other.scraper_id
+
+	def db_table(self):
+		return "scraper_item"
+
+	def db_fields(self):
+		return ["scraper_id","ext_id"]
+
+	def db_values(self, db):
+		text_id = db.get_or_create_text(self.ext_id)
+		return [self.scraper_id,text_id]
+
+	def as_wikidata_claim(self, prop):
+		return self.add_references_qualifiers(WikidataClaimString(prop,self.__str__))
+
 class EntityLetterToType(str, enum.Enum):
 	P = "property"
 	Q = "item"

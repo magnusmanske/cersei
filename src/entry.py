@@ -32,7 +32,7 @@ class PropertyValue:
 		return not (self==other)
 
 class Entry:
-	VALUE_TABLES = ["string","item","time","location","freetext","monolingual_string","labels_etc"]
+	VALUE_TABLES = ["string","item","time","location","freetext","monolingual_string","labels_etc","scraper_item"]
 
 	def __init__(self, scraper_id):
 		self.scraper_id = scraper_id
@@ -81,6 +81,8 @@ class Entry:
 					o = LocationValue(latitude=row["longitude"],longitude=row["longitude"])
 				elif table=="freetext":
 					o = FreetextValue(self.decode(row["value"]))
+				elif table=="scraper_item":
+					o = ScraperItemValue(self.decode(row["scraper_id"]),self.decode(row["ext_id"]))
 				elif table=="monolingual_string":
 					o = MonolingualStringValue(self.decode(row["language"]),self.decode(row["value"]))
 				elif table=="labels_etc":
@@ -110,7 +112,7 @@ class Entry:
 		entity.entity_type = WikidataEntityType.ITEM
 
 		for table,values in self.values.items():
-			if table in ["labels_etc","freetext"]:
+			if table in ["labels_etc","freetext","scraper_item"]:
 				continue
 			for o in values:
 				entity.claims.append(o.as_wikidata_claim())
@@ -132,14 +134,18 @@ class Entry:
 			# TODO add other stuff
 			j["freetext"] = []
 			for freetext in self.values["freetext"]:
-				label = {"property":freetext.property_text(),"value":str(freetext.value)}
-				j["freetext"].append(label)
+				value = {"property":freetext.property_text(),"value":str(freetext.value)}
+				j["freetext"].append(value)
+			j["scraper_item"] = []
+			for scraper_item in (self.values["scraper_item"] or []):
+				value = {"property":scraper_item.property_text(),"scraper_id":scraper_item.value.scraper_id,"ext_id":scraper_item.value.ext_id}
+				j["scraper_item"].append(value)
 
 		j = self.dict_deep_sort(j)
 		return json.dumps(j)
 
 	def has_revision_changed(self,db):
-		json = entry.as_json(True)
+		json = self.as_json(True)
 		json_other = db.get_revision_item(self.revision_id)
 		return (json!=json_other) # TODO test
 		"""
@@ -161,10 +167,12 @@ class Entry:
 		if self.entry_id is None:
 			self.entry_id = db.get_entry_id_for_scraper_and_id(self.scraper_id, self.id)
 		self.revision_id = db.get_current_revision_id(self.entry_id)
-		if self.revision_id!=0 and not self.has_revision_changed(db):
+		rev_changed = self.has_revision_changed(db)
+		if self.revision_id!=0 and not rev_changed:
 			return
 		self.revision_id = db.create_new_revision(self.entry_id)
-		db.set_revision_item(self.revision_id,self.as_json(True))
+		j = self.as_json(True)
+		db.set_revision_item(self.revision_id,j)
 		db.set_current_revision(self.entry_id,self.revision_id)
 
 		# Generate INSERT statements
@@ -232,6 +240,19 @@ class Entry:
 		prop = self.sanitize_property(prop)
 		value = FreetextValue(string)
 		self.values["freetext"].append(PropertyValue(prop,value))
+
+	def add_scraper_item(self,prop,scraper_id: int,ext_id: str):
+		if prop is None or prop<=0:
+			return
+		if scraper_id is None or scraper_id<=0:
+			return
+		ext_id = str(ext_id)
+		if ext_id is None or ext_id.strip()=="":
+			return
+		prop = self.sanitize_property(prop)
+		scraper_id = int(scraper_id)
+		value = ScraperItemValue(scraper_id,ext_id)
+		self.values["scraper_item"].append(PropertyValue(prop,value))
 
 	def add_monolingual_text(self, prop, language: str, value: str):
 		prop = self.sanitize_property(prop)

@@ -16,9 +16,12 @@ class Scraper2(ScraperBase):
 	def scrape_everything(self):
 		db = self.get_db()
 		for url,html,soup in self.scrape_everything_via_follow([self.url]):
-			entry = self.extract_from_entry_page(url,html,soup)
-			if entry is not None:
-				entry.create_or_update_in_database(db)
+			try:
+				entry = self.extract_from_entry_page(url,html,soup)
+				if entry is not None:
+					entry.create_or_update_in_database(db)
+			except Exception as err:
+				print(f"Unexpected {err}")
 		self.text2item_heuristic()
 
 
