@@ -363,7 +363,10 @@ class ToolDatabase :
 		if type(value) in [int,float,str]:
 			return value
 		elif type(value).__name__=='bytes':
-			return value.decode("utf-8")
+			try:
+				return value.decode("utf-8")
+			except:
+				return "UTF-8 DECODING ISSUE"
 		elif type(value).__name__=='datetime':
 			return str(value)
 		elif value is None:

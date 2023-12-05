@@ -73,6 +73,7 @@ if __name__ == "__main__":
 			json = entry.as_json(True)
 			db.set_revision_item(revision_id,json)
 	elif sys.argv[1] == 'test123':
+		import pymysql
 		db = ToolDatabase()
 		# s = """{"offset":0,"scraper_id":1,"links":[["P31","Q5"]]}"""
 		# j = json.loads(s)
@@ -80,8 +81,22 @@ if __name__ == "__main__":
 		#ret = db.query_scrapers()
 		#ret = db.get_entities([123,456])
 		#print(json.dumps(ret, indent=4, sort_keys=True))
-		data = db.column_value_pretty(None)
-		print(data)
+		scraper_id = 3
+		start = 0
+		limit = 50
+		sql = f"SELECT * FROM vw_entry_wide WHERE scraper_id={scraper_id} LIMIT {limit} OFFSET {start}"
+		db = ToolDatabase()
+		with db.connection.cursor(pymysql.cursors.DictCursor) as cursor:
+		    cursor.execute(sql, [])
+		    db.connection.commit()
+		    field_names = list([i[0] for i in cursor.description])
+		    rows = []
+		    for result in cursor.fetchall():
+		        row = []
+		        for col in field_names:
+		            v = db.column_value_pretty(result[col])
+		            row.append(v)
+		        rows.append(row)
 
 
 """ Last scraper runtimes

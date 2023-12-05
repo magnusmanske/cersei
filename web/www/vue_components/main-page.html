@@ -25,18 +25,20 @@
                     <th tt="language"></th>
                     <th tt="property"></th>
                     <th tt="url"></th>
+                    <th tt="status"></th>
                 </tr>
             </thead>
             <tbody>
                 <tr v-for="s in scrapers">
                     <td>{{s.id}}</td>
                     <th><router-link :to='"/scraper/"+s.id'>{{s.name}}</router-link></th>
-                    <td>{{s.entries}}</td>
+                    <td style='text-align: right; font-family: Courier; font-size:12pt;'>{{new Intl.NumberFormat('en').format(s.entries)}}</td>
                     <td>{{s.language}}</td>
                     <td>
                         <a v-if='s.property!=null' target='_blank' class='wikidata' :href='"https://www.wikidata.org/wiki/Property:P"+s.property'>P{{s.property}}</a>
                     </td>
                     <td><a :href='s.url' target='_blank' class='external'>{{s.url}}</a></td>
+                    <td>{{s.status}}</td>
                 </tr>
             </tbody>
         </table>
