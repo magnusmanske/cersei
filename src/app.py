@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from flask import Flask, request, Response, jsonify, send_from_directory
+import pymysql
 import json
 import re
 from tooldatabase import ToolDatabase
@@ -31,6 +32,28 @@ def query_scrapers():
         return jsonify(data)
     except Exception as err:
         return jsonify({'status': f"Unexpected {err=}, {type(err)=}"})
+
+@app.route('/api/entries/<scraper_id>', defaults={'start': 0})
+@app.route('/api/entries/<scraper_id>/<start>')
+def query_entries_per_scraper(scraper_id,start):
+    scraper_id = int(scraper_id)
+    start = int(start)
+    limit = 50
+    sql = f"SELECT * FROM vw_entry_wide WHERE scraper_id={scraper_id} LIMIT {limit} OFFSET {start}"
+    db = ToolDatabase()
+    with db.connection.cursor(pymysql.cursors.DictCursor) as cursor:
+        cursor.execute(sql, [])
+        db.connection.commit()
+        field_names = list([i[0] for i in cursor.description])
+        rows = []
+        for result in cursor.fetchall():
+            row = []
+            for col in field_names:
+                v = db.column_value_pretty(result[col])
+                row.append(v)
+            rows.append(row)
+        #cursor.close()
+        return jsonify({"status":'OK', 'headers':field_names, 'rows':rows})
 
 @app.route('/api/get_entries/<conditions>')
 def query_get_entries(conditions):

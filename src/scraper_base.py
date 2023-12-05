@@ -354,7 +354,7 @@ class ScraperBase(metaclass=abc.ABCMeta):
 
 	def update_from_wikidata(self):
 		if self.property is None:
-			raise Exception("Scraper has not Wikidata property associated")
+			raise Exception("Scraper has no Wikidata property associated")
 		prop = "P"+str(self.property)
 		url = "https://query.wikidata.org/sparql?query=SELECT%20%3Fq%20%3Fvalue%20%7B%20%3Fq%20wdt%3A"+prop+"%20%3Fvalue%20%7D&format=json"
 		response = requests.get(url)
@@ -397,4 +397,3 @@ class ScraperBase(metaclass=abc.ABCMeta):
 
 	def get_data_file_path(self,filename: str):
 		return f"/data/project/cersei/data_files/{filename}"
-	

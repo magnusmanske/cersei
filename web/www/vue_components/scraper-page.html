@@ -1,0 +1,93 @@
+<template id='scraper-page-template'>
+<div class='container'>
+    <div v-if="scraper.id!=undefined">
+        <h1><a :href='scraper.url' target='_blank' class='external'>{{scraper.name}}</a></h1>
+        <batch-navigator :batch_size='batch_size' :total='scraper.entries' :current='offset/batch_size' @set-current='set_offset($event)'></batch-navigator>
+    </div>
+    <div>
+        <table class="table table-striped">
+            <thead>
+            </thead>
+            <tbody>
+                <tr v-for="e in entries">
+                    <th>{{e.source_id}}</th>
+                    <td>
+                        <a v-if='e.url!=null && e.url!=""' :href='e.url' target='_blank' class='external'>{{label(e)}}</a>
+                        <span v-else>{{label(e)}}</span>
+                    </td>
+                    <td>{{e.description}}</td>
+                    <td>
+                        <a v-if='e.q!=null' :href='"https://www.wikidata.org/wiki/"+e.q' target='_blank' class='wikidata'>{{e.q}}</a>
+                    </td>
+                    <td>
+                        <wd-link v-if="e.p31!=null" :item='"Q"+e.p31'></wd-link>
+                    </td>
+                    <td>
+                        <wd-date v-if="e.p569!=null" :tv='date(e.p569)'></wd-date>
+                        <span v-if="e.p569!=null || e.p570!=null"> &ndash; </span>
+                        <wd-date v-if="e.p570!=null" :tv='date(e.p570)'></wd-date>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+</template>
+
+<script>
+'use strict';
+
+var scraper = {};
+
+let ScraperPage = Vue.extend ( {
+    props : ['scraper_id','start'] ,
+    data : function () { return { scraper:{} , offset:0 , batch_size:50 , headers:[] , entries:[] } } ,
+    created : function () {
+        let self = this;
+        if ( typeof self.start!='undefined' ) self.offset = self.start*1;
+        if ( scraper.id == self.scraper_id ) {
+            self.scraper = structuredClone(scraper);
+            self.load_batch();
+        } else {
+            $.get('/api/scrapers',function(d){
+                $.each(d.scrapers,function(k,v){
+                    if (v.id==self.scraper_id) {
+                        scraper = v;
+                        self.scraper = structuredClone(scraper);
+                    }
+                })
+                self.load_batch();
+            },'json');
+        }
+    } ,
+    updated : function () { tt.updateInterface(this.$el) ; } ,
+    mounted : function () { tt.updateInterface(this.$el) ; } ,
+    methods : {
+        label(entry) {
+            return entry.original_label || entry.label;
+        },
+        date(ot) {
+            let t = ot.split('/');
+            return {time:t[0],precision:t[1]*1};
+        },
+        set_offset(x){
+            let offset = this.batch_size*x;
+            this.$router.replace ( '/scraper/'+this.scraper_id+'/'+offset );
+        },
+        load_batch() {
+            let self = this;
+            $.get('/api/entries/'+self.scraper.id+'/'+self.offset,function(d){
+                self.headers = d.headers;
+                self.entries = [];
+                d.rows.forEach((e) => {
+                    let ne = {};
+                    self.headers.forEach((label,idx) => { ne[label] = e[idx] });
+                    self.entries.push(ne);
+                });
+                // console.log(JSON.parse(JSON.stringify(self.entries)));
+            },'json');
+        }
+    } ,
+    template:'#scraper-page-template'
+} ) ;
+</script>

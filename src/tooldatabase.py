@@ -359,6 +359,19 @@ class ToolDatabase :
 			ret[j['id']] = j
 		return ret
 
+	def column_value_pretty(self,value):
+		if type(value) in [int,float,str]:
+			return value
+		elif type(value).__name__=='bytes':
+			return value.decode("utf-8")
+		elif type(value).__name__=='datetime':
+			return str(value)
+		elif value is None:
+			return None
+		else:
+			return str(value)
+
+
 	def query_entries(self,j):
 		conditions = ["`t0`.`current_revision_id`=`t1`.`revision_id`","`t0`.`current_revision_id`=`t2`.`id`"]
 		tables = ['`vw_entry` AS `t0`','`revision_item` AS `t1`','`revision` AS `t2`']
@@ -415,11 +428,7 @@ class ToolDatabase :
 			for index in range(0,len(field_names)):
 				if field_names[index]=='entry':
 					r['entry'] = json.loads(row[index])
-				elif type(row[index]).__name__=='bytes':
-					r[field_names[index]] = row[index].decode("utf-8") 
-				elif type(row[index]).__name__=='datetime':
-					r[field_names[index]] = str(row[index]) # TODO better?
 				else:
-					r[field_names[index]] = row[index]
+					r[field_names[index]] = self.column_value_pretty(row[index])
 			ret.append(r)
 		return ret

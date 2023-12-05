@@ -53,8 +53,11 @@ if __name__ == "__main__":
 		scraper.get_db().add_log("clear_old_revisions",scraper.scraper_id)
 		scraper.clear_old_revisions()
 	elif sys.argv[1] == 'update_from_wikidata':
-		scraper = get_scraper_from_id(sys.argv[2])
-		scraper.update_from_wikidata()
+		try:
+			scraper = get_scraper_from_id(sys.argv[2])
+			scraper.update_from_wikidata()
+		except Exception as err:
+			print(f"Error: {err}")
 	elif sys.argv[1] == 'fill_missing_revision_items':
 		db = ToolDatabase()
 		with db.connection.cursor() as cursor:
@@ -75,8 +78,10 @@ if __name__ == "__main__":
 		# j = json.loads(s)
 		#ret = db.query_entries(j)
 		#ret = db.query_scrapers()
-		ret = db.get_entities([123,456])
-		print(json.dumps(ret, indent=4, sort_keys=True))
+		#ret = db.get_entities([123,456])
+		#print(json.dumps(ret, indent=4, sort_keys=True))
+		data = db.column_value_pretty(None)
+		print(data)
 
 
 """ Last scraper runtimes

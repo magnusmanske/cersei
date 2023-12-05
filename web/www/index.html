@@ -1,71 +1,46 @@
-<html>
-<head>
-<title>CERSEI</title>
-</head>
+<!DOCTYPE HTML>
+<html><head>
+<META NAME="ROBOTS" CONTENT="NOINDEX, NOFOLLOW">
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title tt="toolname"></title>
+<link rel="stylesheet" href="https://tools-static.wmflabs.org/cdnjs/ajax/libs/twitter-bootstrap/4.0.0/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://tools-static.wmflabs.org/magnustools/resources/html/wikimedia.css">
+<script src="https://tools-static.wmflabs.org/cdnjs/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+<script src="https://tools-static.wmflabs.org/cdnjs/ajax/libs/twitter-bootstrap/4.0.0/js/bootstrap.bundle.min.js"></script>
+<script src="https://tools-static.wmflabs.org/cdnjs/ajax/libs/vue/2.5.13/vue.min.js"></script>
+<script src="https://tools-static.wmflabs.org/cdnjs/ajax/libs/vue-router/3.0.1/vue-router.min.js"></script>
+<script src="https://tools-static.wmflabs.org/tooltranslate/tt.js"></script>
+<script src="https://tools-static.wmflabs.org/magnustools/resources/js/wikidata.js"></script>
+<script src="https://tools-static.wmflabs.org/magnustools/resources/vue/shared.js"></script>
+
 <style>
-	dt { font-weight: bold; }
+#working {
+	display:none;
+}
 </style>
 
+</head>
+
 <body>
-<h1>Central External Resource Scraping and Extraction Infrastructure</h1>
-<p>A tool to scrape external resources, extract data in a Wikidata-compatible format, and allow comparison with matching Wikidata items.</p>
-<p>
-<h2>API</h2>
-<dl>
-
-<dt>/api/scrapers</dt>
-<dd>
-<p>Example: <a href="/api/scrapers">All the scrapers</a></p>
-</dd>
-
-<dt>/api/get_entries/&lt;conditions&gt;</dt>
-<dd>
-<p>
-Retrieves a list of entries, depending on <i>conditions</i>. <i>Conditions</i> is a stringified JSON object, with parameters as follows:
-<dl>
-<dt>scraper_id</dt>
-<dd>The ID of a specific scraper (optional)</dd>
-<dt>entry_since</dt>
-<dd>A timestamp (YYYY-MM-DD HH:MM:SS, shorter allowed) for the earliest entry to be returned (optional)</dd>
-<dt>revision_since</td>
-<dd>A timestamp (YYYY-MM-DD HH:MM:SS, shorter allowed) for the earliest revision to be returned (optional)</dd>
-<dt>links</dt>
-<dd>
-    An array of arrays, with each tuple (inner array) consisting of a property and a target (Wikidata) item.
-    The property goes first, either as a string ("P31") or an integer (31).
-    Example: <tt>[["P31","Q5"]]</tt>
-    Multiple property/item tuples are used with logical AND (subset).
-</dd>
-<dt>limit</dt>
-<dd>The maximum number of entries to return (optional; default: 50)</dd>
-<dt>offset</dt>
-<dd>The result number to start from (optional; default: 0)</dd>
-</dl>
-</p>
-<p>
-    <i>Note:</i> The entries will have an "entry" field that is almost identical to a Wikidata item JSON.
-    Key differences include no internal IDs (statements, refernces etc), and the presence of a "freetext" field.
-</p>
-<p>Example: First 50 humans (Q5) for scraper #1,
-	<a href='/api/get_entries/{"offset":0,"scraper_id":1,"links":[["P31","Q5"]]}'>with</a> or 
-	<a href='/api/get_entries/{"offset":0,"scraper_id":1,"links":[["P31","Q5"]],"no_json":1}'>without</a> entry JSON.
-</p>
-</dd>
-
-<dt>/w/api.php</dt>
-<dd>
-<p>A MediaWiki-compatible interface, implementing a tiny subset of functionality</p>
-<p>Example: <a href="/w/api.php?action=wbgetentities&action=wbgetentities&ids=C123,C456">Get entities (using <tt>C1</tt> for entry #1)</a></p>
-</dd>
-
-
-</dl>
-<p>Source: <a href="https://github.com/magnusmanske/cersei/">GitHub</a></p>
-</dt>
-</dl>
-</p>
-</dd>
-</dl>
-</p>
+	<div id='app'>
+		<tool-navbar>
+			<template slot='left'>
+				<li class="nav-item navthing">
+					<a class='btn btn-outline-secondary' target='_blank' href='https://github.com/magnusmanske/cersei' tt='git'></a>
+				</li>
+				<li class="nav-item navthing">
+					<a id='help_page' class='btn btn-outline-info' target='_blank' href='#' tt='help'></a>
+				</li>
+				<li class="nav-item navthing" id='working'>
+					<img src='https://upload.wikimedia.org/wikipedia/commons/c/cd/Vector_Loading_fallback.gif' />
+				</li>
+			</template>
+			<template slot='right'><widar></widar></template>
+		</tool-navbar>
+		<router-view :key="$route.path"><i tt='loading'></i></router-view>
+	</div>
 </body>
+
+<script src="vue.js"></script>
+
 </html>
