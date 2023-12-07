@@ -52,7 +52,6 @@ def query_entries_per_scraper(scraper_id,start):
                 v = db.column_value_pretty(result[col])
                 row.append(v)
             rows.append(row)
-        #cursor.close()
         return jsonify({"status":'OK', 'headers':field_names, 'rows':rows})
 
 @app.route('/api/get_entries/<conditions>')
@@ -65,6 +64,28 @@ def query_get_entries(conditions):
         return jsonify(data)
     except Exception as err:
         return jsonify({'status': f"Unexpected {err=}, {type(err)=}"})
+
+@app.route('/api/relations/<scraper_id>', defaults={'start': 0})
+@app.route('/api/relations/<scraper_id>/<start>')
+def query_get_relations(scraper_id,start):
+    limit = request.args.get('limit', default=500, type=int)
+    earliest = request.args.get('earliest', default='', type=str)
+    rows = []
+    field_names = []
+    db = ToolDatabase()
+    sql = f"SELECT `vw_relations`.* FROM `vw_relations`,`revision` WHERE `revision`.`id`=`revision_id` AND `e1_scraper_id`=%s AND revision.created>=%s LIMIT {limit} OFFSET {start}"
+    with db.connection.cursor() as cursor:
+        cursor.execute(sql, [scraper_id,earliest])
+        db.connection.commit()
+        field_names = list([i[0] for i in cursor.description])
+        rows = []
+        for result in cursor.fetchall():
+            row = {}
+            for i in range(0,len(field_names)):
+                v = db.column_value_pretty(result[i])
+                row[field_names[i]] = v
+            rows.append(row)
+    return jsonify({"status":'OK', 'rows':rows})
 
 @app.route('/w/api.php')
 def query_api_php():
@@ -80,7 +101,6 @@ def query_api_php():
             return jsonify({'success':0, 'error': 'No ids given'})
         db = ToolDatabase()
         entities = db.get_entities(ids)
-        print(entities)
         return jsonify({ 'success':1 , 'entities': entities})
     return jsonify({'success':0, 'error': f"Unknown action '{action}'"})
 

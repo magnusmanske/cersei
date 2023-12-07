@@ -26,6 +26,7 @@
                     <th tt="property"></th>
                     <th tt="url"></th>
                     <th tt="status"></th>
+                    <th tt="see_in_mnm"></th>
                 </tr>
             </thead>
             <tbody>
@@ -39,6 +40,9 @@
                     </td>
                     <td><a :href='s.url' target='_blank' class='external'>{{s.url}}</a></td>
                     <td>{{s.status}}</td>
+                    <td>
+                        <a target='_blank' class='external' :href='"https://mix-n-match.toolforge.org/api.php?query=cersei_forward&scraper="+s.id' tt='see_in_mnm'></a>
+                    </td>
                 </tr>
             </tbody>
         </table>

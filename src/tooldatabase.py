@@ -400,6 +400,9 @@ class ToolDatabase :
 				conditions.append(f" `t0`.`current_revision_id`=`{table}`.`revision_id` AND `{table}`.`property`={prop} AND `{table}`.`q`=%s")
 				params.append(target)
 
+		if "wide" in j:
+			tables[0] = '`vw_entry_wide` AS `t0`'
+
 		# if "has_properties" in j:
 		# 	for prop in j["has_properties"]:
 		# 		prop = self.prop2int(prop)
@@ -414,7 +417,7 @@ class ToolDatabase :
 
 		limit = 50
 		if "limit" in j:
-			limit = min(500,int(j['limit']))
+			limit = min(5000,int(j['limit']))
 		sql += f" LIMIT {limit}"
 		if "offset" in j:
 			offset = int(j['offset'])

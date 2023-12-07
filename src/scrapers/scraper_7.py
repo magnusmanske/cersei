@@ -1,4 +1,3 @@
-from urllib.parse import unquote
 from bs4 import BeautifulSoup
 from src.scraper_base import ScraperBase
 import requests
@@ -86,7 +85,7 @@ class Scraper7(ScraperBase):
 				for a in value.find_all('a'):
 					m = re.match(r"^search-page/artist/(.+)$",a['href'])
 					if m is not None:
-						artist_id = unquote(m.group(1)).strip()
+						artist_id = self.unquote(m.group(1))
 						entry.add_scraper_item(170,self.person_scraper_id,artist_id)
 						artist_entry = self.process_artist(artist_id,a.text)
 						if artist_entry is not None:
@@ -95,7 +94,7 @@ class Scraper7(ScraperBase):
 				for a in value.find_all('a'):
 					m = re.match(r"^/detail-view-museum/(.+)$",a['href'])
 					if m is not None:
-						museum_id = unquote(m.group(1)).strip()
+						museum_id = self.unquote(m.group(1))
 						entry.add_scraper_item(276,self.museum_scraper_id,museum_id)
 						museum_entry = self.process_museum(museum_id)
 						if museum_entry is not None:

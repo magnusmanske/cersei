@@ -80,13 +80,15 @@ class Scraper5(ScraperBase):
 	def process_person(self,person):
 		entry = Entry(self.person_scraper_id)
 		entry.id = str(person["id"])
-		url = f"https://www.kansallisgalleria.fi/en/artist/{entry.id}"
-		entry.add_label_etc(url,"url","en")
 		entry.add_item("P31","Q5") # human
 		entry.add_freetext(735,person["firstName"])
 		entry.add_freetext(734,person["familyName"])
 		text = (person["firstName"] or '')+' '+(person["familyName"] or '')
 		entry.add_label_etc(text.strip(),"label","en")
+
+		url = f"https://www.kansallisgalleria.fi/en/search?authors[]={text}"
+		entry.add_label_etc(url,"url","en")
+
 		entry.add_freetext(19,person["birthPlace"])
 		entry.add_freetext(20,person["deathPlace"])
 

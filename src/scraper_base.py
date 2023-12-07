@@ -6,6 +6,7 @@ from src.entry import Entry
 from src.values import TimeValue
 import datetime
 import requests
+from urllib.parse import unquote
 
 class ScraperBase(metaclass=abc.ABCMeta):
 	PROP2GROUP = {
@@ -96,6 +97,11 @@ class ScraperBase(metaclass=abc.ABCMeta):
 		descs_no_empty = filter(lambda d: d.strip()!="", descs)
 		short_description = "; ".join(descs_no_empty)
 		entry.add_label_etc(short_description,"description",self.language)
+
+	def unquote(s):
+		ret = unquote(m.group(1))
+		ret = ret.replace('&#40;','(').replace('&#41;',')') # TODO generic
+		return ret.strip()
 
 	def string2item(self,prop,text):
 		db = self.get_db()
