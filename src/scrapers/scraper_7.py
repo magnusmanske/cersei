@@ -5,7 +5,7 @@ import subprocess
 import re
 import json
 import gzip
-from src.values import TimeValue
+from src.values import TimeValue,QuantityValue
 from src.entry import Entry
 
 # ATTENTION this also updates scraper 8 (artist) and 9 (museum)
@@ -18,7 +18,7 @@ class Scraper7(ScraperBase):
 		super().__init__(7)
 		self.person_scraper_id = 8
 		self.museum_scraper_id = 9
-		self.person_entry_cache = ['unknown'] # Skip some "generic" ones
+		self.person_entry_cache = ['unknown','unbekannt'] # Skip some "generic" ones
 		self.museum_entry_cache = []
 
 	def scrape_everything(self):
@@ -66,6 +66,8 @@ class Scraper7(ScraperBase):
 		entry.id = artwork_id
 		url = self.construct_entry_url_from_id(entry.id)
 		entry.add_label_etc(url,"url","en")
+		entry.add_string(973,url) # described at URL
+		entry.add_item("P31","Q838948") # artwork
 		page = requests.get(url)
 		html = page.text
 		soup = BeautifulSoup(html,features="html.parser")
@@ -105,7 +107,23 @@ class Scraper7(ScraperBase):
 				entry.add_label_etc(value.text.strip(),"description","en")
 			elif h3.string=='Material':
 				entry.add_freetext(186,value.text.strip())
+			elif h3.string=='Height':
+				parsed_value = self.parse_quantity(value.text)
+				if parsed_value is not None:
+					entry.add_quantity(2048,parsed_value.amount,parsed_value.unit)
+			elif h3.string=='Width':
+				parsed_value = self.parse_quantity(value.text)
+				if parsed_value is not None:
+					entry.add_quantity(2049,parsed_value.amount,parsed_value.unit)
+			elif h3.string=='Provenance':
+				entry.add_freetext(127,f"{h3.string}: "+value.text.strip())
+			elif h3.string=='Provenance according to museum / collection':
+				entry.add_freetext(127,f"{h3.string}: "+value.text.strip())
+			elif h3.string=='Former owner according to museum / collection':
+				entry.add_freetext(127,f"{h3.string}: "+value.text.strip())
+				
 		yield entry
+
 
 	def process_museum(self,museum_id):
 		if museum_id in self.museum_entry_cache:

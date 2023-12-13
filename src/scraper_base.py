@@ -3,7 +3,7 @@ import abc
 import toolforge
 from src.tooldatabase import ToolDatabase
 from src.entry import Entry
-from src.values import TimeValue
+from src.values import TimeValue,QuantityValue
 import datetime
 import requests
 from urllib.parse import unquote
@@ -59,10 +59,10 @@ class ScraperBase(metaclass=abc.ABCMeta):
 		raise Exception ("ScraperBase::links_to_follow should be overloaded")
 
 	"""Constructs the URL of the entry based on its ID"""
-	def construct_entry_url_from_id(self,id):
+	def construct_entry_url_from_id(self,external_id):
 		if self.url_pattern is None:
 			return ""
-		return self.url_pattern.replace('$1',id)
+		return self.url_pattern.replace('$1',f"{external_id}")
 
 	def load_scraper_from_db(self,scraper_id):
 		self.scraper_id = scraper_id
@@ -98,8 +98,8 @@ class ScraperBase(metaclass=abc.ABCMeta):
 		short_description = "; ".join(descs_no_empty)
 		entry.add_label_etc(short_description,"description",self.language)
 
-	def unquote(s):
-		ret = unquote(m.group(1))
+	def unquote(self,s):
+		ret = unquote(s)
 		ret = ret.replace('&#40;','(').replace('&#41;',')') # TODO generic
 		return ret.strip()
 
@@ -403,3 +403,29 @@ class ScraperBase(metaclass=abc.ABCMeta):
 
 	def get_data_file_path(self,filename: str):
 		return f"/data/project/cersei/data_files/{filename}"
+
+
+	def parse_quantity(self, quantity_text):
+		qt = quantity_text.strip().lower()
+		m = re.match(r"^([+-]{0,1}[0-9.]+)\s*(\S*)$",qt)
+		if m is None:
+			return
+		amount = m.group(1)*1
+		unit = m.group(2).strip()
+		if unit=='cm':
+			unit = "Q174728"
+		elif unit=='mm':
+			unit = "Q174789"
+		elif unit=='m':
+			unit = "Q11573"
+		else:
+			unit = None
+		qv = QuantityValue(amount,unit)
+		return qv
+
+class DummyScraper(ScraperBase):
+	def __init__(self,scraper_id):
+		super().__init__(scraper_id)
+
+	def scrape_everything(self):
+		raise Exception ("DummyScraper::scrape_everything should never be called")

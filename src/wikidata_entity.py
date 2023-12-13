@@ -103,6 +103,18 @@ class WikidataClaimLocation(WikidataClaim):
 		return d
 
 
+class WikidataClaimQuantity(WikidataClaim):
+	def __init__(self, prop: str, amount: float, unit, rank = "normal", id = None):
+		super().__init__(prop, id, rank)
+		self.amount = amount
+		self.unit = unit
+
+	def as_dict(self):
+		d = self.get_base_dict()
+		d["mainsnak"]["datavalue"] = {"value":{"amount":f"{self.amount}"},"type":"quantity"}
+		if self.unit is not None:
+			d["mainsnak"]["datavalue"]["value"]["unit"] = f"http://www.wikidata.org/entity/{self.unit}"
+		return d
 
 class WikidataEntity:
 

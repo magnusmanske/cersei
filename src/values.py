@@ -56,7 +56,7 @@ class StringValue(Value):
 class FreetextValue(Value):
 	def __init__(self, value):
 		super().__init__()
-		self.value = value
+		self.value = value[:240] # column in VARBINARY(255)
 
 	def __str__(self):
 		return self.value
@@ -269,3 +269,38 @@ class LocationValue(Value):
 
 	def as_wikidata_claim(self, prop):
 		return self.add_references_qualifiers(WikidataClaimLocation(prop,self.latitude,self.longitude))
+
+
+class QuantityValue(Value):
+	def __init__(self, amount: float, unit=None):
+		super().__init__()
+		self.amount = amount
+		self.unit = unit
+
+	def __str__(self):
+		ret = f"{self.amount}"
+		if self.unit is not None:
+			ret += f" [{self.unit}]"
+		return ret
+
+	def __lt__(self,other):
+		# NOTE: This is not numerical, normalized order, but /some/ order
+		if self.amount!=other.amount:
+			return self.latitude<amount.amount
+		if self.unit is None:
+			return True
+		if other.unit is None:
+			return False
+		return self.unit<other.unit
+
+	def db_table(self):
+		return "quantity"
+
+	def db_fields(self):
+		return ["amount","unit"]
+
+	def db_values(self, db):
+		return [self.amount,self.unit]
+
+	def as_wikidata_claim(self, prop):
+		return self.add_references_qualifiers(WikidataClaimQuantity(prop,self.amount,self.unit))

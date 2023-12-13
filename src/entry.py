@@ -32,7 +32,7 @@ class PropertyValue:
 		return not (self==other)
 
 class Entry:
-	VALUE_TABLES = ["string","item","time","location","freetext","monolingual_string","labels_etc","scraper_item"]
+	VALUE_TABLES = ["string","item","time","location","quantity","freetext","monolingual_string","labels_etc","scraper_item"]
 
 	def __init__(self, scraper_id):
 		self.scraper_id = scraper_id
@@ -63,7 +63,7 @@ class Entry:
 	def load_from_revision(self,db,revision_id):
 		self.revision_id = int(revision_id)
 		for table,value in self.values.items():
-			if table in ["time","location"]:
+			if table in ["time","location","quantity"]:
 				query_table=table
 			else:
 				query_table="vw_"+table
@@ -79,6 +79,8 @@ class Entry:
 					o = TimeValue(tv=row["value"],precision=row["precision"])
 				elif table=="location":
 					o = LocationValue(latitude=row["longitude"],longitude=row["longitude"])
+				elif table=="quantity":
+					o = QuantityValue(amount=row["amount"],unit=row["unit"])
 				elif table=="freetext":
 					o = FreetextValue(self.decode(row["value"]))
 				elif table=="scraper_item":
@@ -233,6 +235,11 @@ class Entry:
 		prop = self.sanitize_property(prop)
 		value = LocationValue(latitude, longitude)
 		self.values["location"].append(PropertyValue(prop,value))
+
+	def add_quantity(self, prop, amount: float, unit=None):
+		prop = self.sanitize_property(prop)
+		value = QuantityValue(amount, unit)
+		self.values["quantity"].append(PropertyValue(prop,value))
 
 	def add_freetext(self,prop,string: str):
 		if string is None or string.strip()=="":

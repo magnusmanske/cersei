@@ -18,6 +18,30 @@
 <p>Example: <a href="/api/scrapers">All the scrapers</a></p>
 </dd>
 
+
+<dt>/api/get_entry/&lt;entry_id&gt;</dt>
+<dd>
+<p>
+This returns "extended wikibase JSON" for an entry. All parsed data for that entry is in there.
+The format is essentially wikibase JSON but with added sections:
+<dl>
+<dt>freetext</dt>
+<dd>A list of property/text pairs, where we know the information (eg place of birth: "Springfield"), but cannot automatically assign a Wikidata item ID (which Springfield does the source mean)? Such information is stored as "freetext", to be reconciled later.</dd>
+<dt>scraper_item</dt>
+<dd>We know this referes to another CERSEI entry, often from the same source (eg the creator of an artwork), but there is no Wikidata item associated with that entry yet. "scraper_item" is intended to preserve that relationship, to be reconciled later.</dd>
+</dl>
+</p>
+<p>
+<h3>Parameters:</h3>
+<dl>
+<dt>entry_id</dt>
+<dd>The ID of a specific entry (numeric or "C" prefix both work)</dd>
+</dl>
+</p>
+<p>Example: <a href="https://cersei.toolforge.org/api/get_entry/317353"><i>Pattern book with needles</i></a>
+</dd>
+
+
 <dt>/api/get_entries/&lt;conditions&gt;</dt>
 <dd>
 <p>

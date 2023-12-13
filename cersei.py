@@ -2,12 +2,14 @@
 
 import sys
 import importlib
+from src.scraper_base import DummyScraper
+from src.artworks import Artworks
 import json # For test123
 import toolforge  # For oneoff TESTING FIXME
 from src.tooldatabase import ToolDatabase # For oneoff TESTING FIXME
 from src.entry import Entry # For oneoff TESTING FIXME
 
-def get_scraper_from_id(scraper_id):
+def get_scraper_from_id(scraper_id, allow_dummy=False):
 	try:
 		module_name = "src.scrapers.scraper_"+str(scraper_id)
 		class_name = "Scraper"+str(scraper_id)
@@ -16,6 +18,9 @@ def get_scraper_from_id(scraper_id):
 		scraper = class_()
 		return scraper
 	except:
+		if allow_dummy:
+			scraper = DummyScraper(scraper_id)
+			return scraper
 		print(f"No or broken scraper found for #{scraper_id}")
 		exit(0)
 
@@ -54,10 +59,14 @@ if __name__ == "__main__":
 		scraper.clear_old_revisions()
 	elif sys.argv[1] == 'update_from_wikidata':
 		try:
-			scraper = get_scraper_from_id(sys.argv[2])
+			scraper = get_scraper_from_id(sys.argv[2],allow_dummy=True)
 			scraper.update_from_wikidata()
 		except Exception as err:
 			print(f"Error: {err}")
+	elif sys.argv[1] == 'artwork2qs':
+		artworks = Artworks()
+		qs_commands = artworks.generate_qs()
+		artworks.run_qs(qs_commands)
 	elif sys.argv[1] == 'fill_missing_revision_items':
 		db = ToolDatabase()
 		with db.connection.cursor() as cursor:
@@ -73,25 +82,12 @@ if __name__ == "__main__":
 			json = entry.as_json(True)
 			db.set_revision_item(revision_id,json)
 	elif sys.argv[1] == 'test123':
-		scraper_id = 7
-		start = 0
+		scraper = get_scraper_from_id(7)
+		for entry in scraper.process_artwork(8702):
+			print(entry.get_line())
+	else:
+		print (f"Unknown action {sys.argv[1]}")
 
-		rows = []
-		field_names = []
-		db = ToolDatabase()
-		sql = f"SELECT * FROM `vw_relations` WHERE `e1_scraper_id`={scraper_id} LIMIT 500 OFFSET {start}"
-		with db.connection.cursor() as cursor:
-			cursor.execute(sql, [])
-			db.connection.commit()
-			field_names = list([i[0] for i in cursor.description])
-			rows = []
-			for result in cursor.fetchall():
-			    row = {}
-			    for i in range(0,len(field_names)):
-			        v = db.column_value_pretty(result[i])
-			        row[field_names[i]] = v
-			    rows.append(row)
-		print (rows)
 
 
 """ Last scraper runtimes

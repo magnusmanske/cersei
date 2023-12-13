@@ -27,8 +27,9 @@
                         <span v-if="e.p569!=null || e.p570!=null"> &ndash; </span>
                         <wd-date v-if="e.p570!=null" :tv='date(e.p570)'></wd-date>
                     </td>
-                    <td>
-                        <a :href='"/w/api.php?action=wbgetentities&ids=C"+e.entry_id' tt="json" target="_blank"></a>
+                    <td style="white-space: nowrap; font-size:9pt;">
+                        <a :href='"/api/get_entry/"+e.entry_id' tt="json" target="_blank"></a><br/>
+                        <a :href='"/w/api.php?action=wbgetentities&ids=C"+e.entry_id' tt="wd-json" target="_blank"></a>
                     </td>
                 </tr>
             </tbody>

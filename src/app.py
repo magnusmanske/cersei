@@ -54,6 +54,18 @@ def query_entries_per_scraper(scraper_id,start):
             rows.append(row)
         return jsonify({"status":'OK', 'headers':field_names, 'rows':rows})
 
+@app.route('/api/get_entry/<entry_id>')
+def query_get_entry(entry_id):
+    try:
+        entry_id_numeric = re.sub(r"\D",'',f"{entry_id}")
+        db = ToolDatabase()
+        revision_id = db.get_current_revision_id(entry_id_numeric)
+        j = db.get_revision_item(revision_id)
+        data = { "status":"OK", "entry":json.loads(j) }
+        return jsonify(data)
+    except Exception as err:
+        return jsonify({'status': f"Unexpected {err=}, {type(err)=}"})
+
 @app.route('/api/get_entries/<conditions>')
 def query_get_entries(conditions):
     try:
