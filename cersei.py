@@ -51,10 +51,10 @@ if __name__ == "__main__":
 			pass
 		scraper.get_db().add_log("end_scrape_new",scraper.scraper_id)
 	elif sys.argv[1] == 'freetext2items':
-		scraper = get_scraper_from_id(sys.argv[2])
+		scraper = get_scraper_from_id(sys.argv[2],allow_dummy=True)
 		scraper.text2item_heuristic()
 	elif sys.argv[1] == 'clear_scraper_history':
-		scraper = get_scraper_from_id(sys.argv[2])
+		scraper = get_scraper_from_id(sys.argv[2],allow_dummy=True)
 		scraper.get_db().add_log("clear_old_revisions",scraper.scraper_id)
 		scraper.clear_old_revisions()
 	elif sys.argv[1] == 'update_from_wikidata':
@@ -65,8 +65,10 @@ if __name__ == "__main__":
 			print(f"Error: {err}")
 	elif sys.argv[1] == 'artwork2qs':
 		artworks = Artworks()
+		artworks.verbose = False
 		qs_commands = artworks.generate_qs()
-		artworks.run_qs(qs_commands)
+		print (qs_commands)
+		#artworks.run_qs(qs_commands)
 	elif sys.argv[1] == 'fill_missing_revision_items':
 		db = ToolDatabase()
 		with db.connection.cursor() as cursor:

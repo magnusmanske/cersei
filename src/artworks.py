@@ -101,7 +101,7 @@ class Artworks:
 				wd_prop = f"P{row[fields['wd_prop']]}"
 				source_id = row[fields['work_source_id']]
 				if self.entity_has_string_statement(entity,wd_prop,source_id):
-					self.log("{q} already has {wd_prop}:{source_id}")
+					self.log(f"{q} already has {wd_prop}:{source_id}")
 					continue
 
 				# retrieved = DateQualifier.retrieved(datetime.utcnow())

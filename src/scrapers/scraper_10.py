@@ -76,7 +76,7 @@ class Scraper10(ScraperBase):
 					yield entry_artist
 			except:
 				print (f"Problem with {artist}")
-				pass
+		print (entry)
 		yield entry
 
 	def add_dimensions(self,entry,s):
