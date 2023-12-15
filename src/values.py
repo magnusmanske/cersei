@@ -1,6 +1,7 @@
 import abc
 import datetime
 import enum
+import json
 from src.wikidata_entity import *
 
 class Value(metaclass=abc.ABCMeta):
@@ -26,8 +27,40 @@ class Value(metaclass=abc.ABCMeta):
 	def as_wikidata_claim(self, prop):
 		"""Returns the value as a Wikidata claim"""
 
+	def str_ref_qual(self):
+		if len(self.references)+len(self.qualifiers)==0:
+			return ''
+		ret = ''
+		if len(self.qualifiers)>0:
+			parts = []
+			for qual in self.qualifiers:
+				parts.append(f"{qual.prop}:{qual.value}")
+			ret += ' {' + ' | '.join(parts) + '}'
+		if len(self.references)>0:
+			ret += " /TODO REFERENCES/"
+		return ret
+
 	def add_references_qualifiers(self, claim):
 		return claim # TODO
+
+	def json_compatible(self):
+		ret = self.__dict__
+		ret['classname'] = type(self).__name__
+		return ret
+	
+	def get_qualifiers_text_id(self, db):
+		if len(self.qualifiers)==0:
+			return None
+		qualifiers = []
+		for qual in self.qualifiers:
+			qual_new = {}
+			qual_new['prop'] = qual.prop
+			qual_new['value'] = qual.value.json_compatible()
+			qualifiers.append(qual_new)
+		qualifiers_text = json.dumps(qualifiers,sort_keys=True)
+		qualifiers_text_id = db.get_or_create_text(qualifiers_text)
+		return qualifiers_text_id
+
 
 class StringValue(Value):
 	def __init__(self, value):
@@ -35,7 +68,7 @@ class StringValue(Value):
 		self.value = value
 
 	def __str__(self):
-		return self.value
+		return self.value+self.str_ref_qual()
 
 	def __lt__(self,other):
 		return self.value<other.value
@@ -59,7 +92,7 @@ class FreetextValue(Value):
 		self.value = value[:240] # column in VARBINARY(255)
 
 	def __str__(self):
-		return self.value
+		return self.value+self.str_ref_qual()
 
 	def __lt__(self,other):
 		return self.value<other.value
@@ -84,7 +117,7 @@ class ScraperItemValue(Value):
 		self.ext_id = ext_id
 
 	def __str__(self):
-		return f"{self.scraper_id}:{self.ext_id}"
+		return f"{self.scraper_id}:{self.ext_id}"+self.str_ref_qual()
 
 	def __lt__(self,other):
 		if self.scraper_id==other.scraper_id:
@@ -126,12 +159,22 @@ class ItemValue(Value):
 		self.item_id = int(number_string)
 
 	def __str__(self):
-		return str(self.item_id)+" ("+self.item_type+")"
+		return str(self.item_id)+" ("+self.item_type+")"+self.str_ref_qual()
 
 	def __lt__(self,other):
 		if self.item_type!=other.item_type:
 			return self.item_type<other.item_type
 		return self.item_id<other.item_id
+
+	def json_compatible(self):
+		ret = self.__dict__
+		ret['classname'] = type(self).__name__
+		ret['item_type'] = self.item_type.name
+		if len(ret['references'])==0:
+			ret.pop('references', None)
+		if len(ret['qualifiers'])==0:
+			ret.pop('qualifiers', None)
+		return ret
 
 	def db_table(self):
 		return "item"
@@ -158,7 +201,7 @@ class LabelsEtcValue(Value):
 		self.language = str(language).strip()
 
 	def __str__(self):
-		return self.type_name.upper()+" "+self.language+":"+self.value
+		return self.type_name.upper()+" "+self.language+":"+self.value+self.str_ref_qual()
 
 	def __lt__(self,other):
 		if self.type_name!=other.type_name:
@@ -188,7 +231,7 @@ class MonolingualStringValue(Value):
 		self.language = str(language).strip()
 
 	def __str__(self):
-		return self.language+":"+self.value
+		return self.language+":"+self.value+self.str_ref_qual()
 
 	def __lt__(self,other):
 		if self.language!=other.language:
@@ -225,7 +268,7 @@ class TimeValue(Value):
 			self.time_value = "+" + self.time_value
 
 	def __str__(self):
-		return self.time_value+"/"+str(self.precision)
+		return self.time_value+"/"+str(self.precision)+self.str_ref_qual()
 
 	def __lt__(self,other):
 		if self.precision!=other.precision:
@@ -251,7 +294,7 @@ class LocationValue(Value):
 		self.longitude = longitude
 
 	def __str__(self):
-		return str(self.latitude)+", "+str(self.longitude)
+		return str(self.latitude)+", "+str(self.longitude)+self.str_ref_qual()
 
 	def __lt__(self,other):
 		if self.latitude!=other.latitude:
@@ -281,7 +324,7 @@ class QuantityValue(Value):
 		ret = f"{self.amount}"
 		if self.unit is not None:
 			ret += f" [{self.unit}]"
-		return ret
+		return ret+self.str_ref_qual()
 
 	def __lt__(self,other):
 		# NOTE: This is not numerical, normalized order, but /some/ order

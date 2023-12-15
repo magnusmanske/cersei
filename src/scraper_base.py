@@ -127,9 +127,12 @@ class ScraperBase(metaclass=abc.ABCMeta):
 		for html in self.paginate_index():
 			try:
 				for entry in self.parse_index_page(html):
-					entry.create_or_update_in_database(db)
-			except:
-				pass
+					try:
+						entry.create_or_update_in_database(db)
+					except Exception as err:
+						print(f"scrape_everything_via_index[1]: ", file=sys.stderr)
+			except Exception as err:
+				print(f"scrape_everything_via_index[2]: ", file=sys.stderr)
 		self.text2item_heuristic()
 
 	def place_heuristic(self,text):
@@ -335,6 +338,8 @@ class ScraperBase(metaclass=abc.ABCMeta):
 				return # Can't continue
 
 	def add_date_or_freetext(self,prop,date_string,entry):
+		if date_string is None or date_string.strip()=='' or date_string.strip()=='?':
+			return
 		if len(self.date_patterns)==0:
 			raise Exception("add_date_or_freetext is used but no date_patterns are set")
 		date_string = str(date_string).strip()
@@ -406,7 +411,7 @@ class ScraperBase(metaclass=abc.ABCMeta):
 
 
 	def parse_quantity(self, quantity_text):
-		qt = quantity_text.strip().lower()
+		qt = quantity_text.strip().lower().replace(',','.') # de,fr etc. have comma instead of decimal point
 		m = re.match(r"^([+-]{0,1}[0-9.]+)\s*(\S*)$",qt)
 		if m is None:
 			return

@@ -84,9 +84,10 @@ if __name__ == "__main__":
 			json = entry.as_json(True)
 			db.set_revision_item(revision_id,json)
 	elif sys.argv[1] == 'test123':
-		scraper = get_scraper_from_id(7)
-		for entry in scraper.process_artwork(8702):
-			print(entry.get_line())
+		db = ToolDatabase()
+		entry = Entry(12)
+		entry.load_from_revision(db, 647083)
+		print (entry)
 	else:
 		print (f"Unknown action {sys.argv[1]}")
 

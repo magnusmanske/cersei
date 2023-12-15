@@ -5,7 +5,7 @@ import json
 
 class PropertyValue:
 	def __init__(self, prop, value):
-		self.prop = prop
+		self.prop = self.sanitize_property(prop)
 		self.value = value
 
 	def as_wikidata_claim(self):
@@ -14,8 +14,17 @@ class PropertyValue:
 	def property_text(self)->str:
 		return "P"+str(self.prop)
 
+	def sanitize_property(self,prop) -> int:
+		prop = str(prop).strip().upper()
+		if prop[0]=="P":
+			prop = prop[1:]
+		return int(prop)
+
 	def __str__(self):
 		return self.property_text()+":"+str(self.value)
+	
+	def __repr__(self):
+		return self.__str__()
 
 	def __lt__(self,other):
 		if self.prop < other.prop:
@@ -63,10 +72,7 @@ class Entry:
 	def load_from_revision(self,db,revision_id):
 		self.revision_id = int(revision_id)
 		for table,value in self.values.items():
-			if table in ["time","location","quantity"]:
-				query_table=table
-			else:
-				query_table="vw_"+table
+			query_table="vw_"+table
 			rows = db.load_table_for_revision(self.revision_id,query_table)
 			if rows is None:
 				continue
@@ -89,6 +95,25 @@ class Entry:
 					o = MonolingualStringValue(self.decode(row["language"]),self.decode(row["value"]))
 				elif table=="labels_etc":
 					o = LabelsEtcValue(self.decode(row["value"]),row["type_name"],self.decode(row["language"]))
+				if 'qualifiers' in row and row['qualifiers'] is not None:
+					try:
+						o.qualifiers = []
+						for qual in json.loads(self.decode(row["qualifiers"])):
+							print (f"{qual}")
+							prop = qual["prop"]
+							qv = qual["value"]
+							if "classname" not in qv:
+								print (f"load_from_revision: No classname {qual}", file=sys.stderr)
+								exit(0)
+							if qv["classname"]=='ItemValue':
+								value = ItemValue(f"{qv['item_type']}{qv['item_id']}")
+							else:
+								print (f"load_from_revision: Unknown pv {qual}", file=sys.stderr)
+								exit(0)
+							nq = PropertyValue(prop,value)
+							o.qualifiers.append(nq)
+					except Exception as err:
+						print(f"Entry::load_from_revision: qualifier load error {row}", file=sys.stderr)
 				prop = 0
 				if "property" in row:
 					prop = int(row["property"])
@@ -183,14 +208,20 @@ class Entry:
 				continue
 			columns = ["revision_id"]
 			has_property = (table!="labels_etc")
+			has_qualifiers = has_property
 			if has_property:
 				columns.append("property")
+			if has_qualifiers:
+				columns.append("qualifiers_text_id")
 			columns += prop_values[0].value.db_fields()
 			rows = []
 			for prop_value in prop_values:
 				row = [ self.revision_id ]
 				if has_property:
 					row.append(prop_value.prop)
+				if has_qualifiers:
+					qualifiers = prop_value.value.get_qualifiers_text_id(db)
+					row.append(qualifiers)
 				row += prop_value.value.db_values(db)
 				rows.append(row)
 			db.insert_group(table,columns,rows)
@@ -213,42 +244,56 @@ class Entry:
 		v = LabelsEtcValue(value,type_name,language)
 		self.values["labels_etc"].append(PropertyValue(0,v))
 
-	def add_string(self,prop,string: str):
+	def add_string(self,prop,string: str, references=[], qualifiers=[]):
 		if string is None or string.strip()=="":
 			return
 		prop = self.sanitize_property(prop)
 		value = StringValue(string)
+		value.references = references
+		value.qualifiers = qualifiers
 		self.values["string"].append(PropertyValue(prop,value))
 
-	def add_item(self,prop,q: str):
+	def add_item(self,prop,q: str, references=[], qualifiers=[]):
 		if q is None or q.strip()=="":
 			return
 		prop = self.sanitize_property(prop)
 		item = ItemValue(q)
+		item.references = references
+		item.qualifiers = qualifiers
 		self.values["item"].append(PropertyValue(prop,item))
 
-	def add_time(self,prop,tv: TimeValue):
+	def add_time(self,prop,tv: TimeValue, references=[], qualifiers=[]):
 		prop = self.sanitize_property(prop)
+		if len(tv.references)==0:
+			tv.references = references
+		if len(tv.qualifiers)==0:
+			tv.qualifiers = qualifiers
 		self.values["time"].append(PropertyValue(prop,tv))
 
-	def add_location(self, prop, latitude: float, longitude: float):
+	def add_location(self, prop, latitude: float, longitude: float, references=[], qualifiers=[]):
 		prop = self.sanitize_property(prop)
 		value = LocationValue(latitude, longitude)
+		value.references = references
+		value.qualifiers = qualifiers
 		self.values["location"].append(PropertyValue(prop,value))
 
-	def add_quantity(self, prop, amount: float, unit=None):
+	def add_quantity(self, prop, amount: float, unit=None, references=[], qualifiers=[]):
 		prop = self.sanitize_property(prop)
 		value = QuantityValue(amount, unit)
+		value.references = references
+		value.qualifiers = qualifiers
 		self.values["quantity"].append(PropertyValue(prop,value))
 
-	def add_freetext(self,prop,string: str):
-		if string is None or string.strip()=="":
+	def add_freetext(self,prop,string: str, references=[], qualifiers=[]):
+		if string is None or string.strip()=="" or string.strip()=="?":
 			return
 		prop = self.sanitize_property(prop)
 		value = FreetextValue(string)
+		value.references = references
+		value.qualifiers = qualifiers
 		self.values["freetext"].append(PropertyValue(prop,value))
 
-	def add_scraper_item(self,prop,scraper_id: int,ext_id: str):
+	def add_scraper_item(self,prop,scraper_id: int,ext_id: str, references=[], qualifiers=[]):
 		if prop is None or prop<=0:
 			return
 		if scraper_id is None or scraper_id<=0:
@@ -259,11 +304,15 @@ class Entry:
 		prop = self.sanitize_property(prop)
 		scraper_id = int(scraper_id)
 		value = ScraperItemValue(scraper_id,ext_id)
+		value.references = references
+		value.qualifiers = qualifiers
 		self.values["scraper_item"].append(PropertyValue(prop,value))
 
-	def add_monolingual_text(self, prop, language: str, value: str):
+	def add_monolingual_text(self, prop, language: str, value: str, references=[], qualifiers=[]):
 		prop = self.sanitize_property(prop)
 		value = MonolingualStringValue(language, value)
+		value.references = references
+		value.qualifiers = qualifiers
 		self.values["monolingual_string"].append(PropertyValue(prop,value))
 
 	def is_valid(self):

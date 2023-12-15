@@ -3,21 +3,36 @@ from src.scraper_base import ScraperBase
 import requests
 import subprocess
 import re
+import sys
 import json
 import string
-from src.values import TimeValue,QuantityValue
-from src.entry import Entry
+from src.values import TimeValue,QuantityValue,ItemValue
+from src.entry import Entry,PropertyValue
 
 # ATTENTION this also updates scraper 13 (artist)
 
 class Scraper12(ScraperBase):
-
 	"""FNAC
 	"""
+
+	DOMAIN_DENOMINATION = {
+		"photographie": "Q125191",
+		"peinture": "Q3305213",
+		"oeuvre en 3 dimensions": "Q350268",
+		"sculpture": "Q860861",
+		"livre": "Q571",
+		"vase": "Q191851",
+		"dessin": "Q93184",
+		"oeuvre textile": "Q22075301",
+		"estampe": "Q11835431",
+		"ustensile de cuisine": "Q3773693"
+	}
+
 	def __init__(self):
 		super().__init__(12)
 		self.person_scraper_id = 13
 		self.person_entry_cache = []
+		self.date_patterns = [ ("%Y",9) ]
 
 	def scrape_everything(self):
 		self.scrape_everything_via_index()
@@ -36,7 +51,7 @@ class Scraper12(ScraperBase):
 				totalcount = j['totalCount']
 				so_far += pageSize
 			except Exception as err:
-				print(f"Unexpected {err}")
+				print(f"paginate_index: Unexpected {err}", file=sys.stderr)
 
 	def parse_index_page(self,j):
 		for result in j['results']:
@@ -45,20 +60,32 @@ class Scraper12(ScraperBase):
 					for entry in self.process_ua(result["_source"]["ua"]):
 						yield entry
 			except Exception as err:
-				print(f"Unexpected {err}")
+				print(f"parse_index_page: Unexpected {err}", file=sys.stderr)
 
 	def process_ua(self,ua):
+		if "artwork" not in ua:
+			return
 		artist_ids = []
+		artwork_entry,authors_birth_death = self.process_artwork(ua["artwork"])
+		
 		if "authors" in ua:
+			if len(ua["authors"])!=1:
+				authors_birth_death = '' # To make sure not ao add dates to wrong authors
 			for artist in ua["authors"]:
-				for entry in self.process_artist(artist):
-					artist_ids.append(entry.id)
-					yield entry
-		if "artwork" in ua:
-			for entry in self.process_artwork(ua["artwork"]):
-				for artist_id in artist_ids:
-					entry.add_scraper_item(170,self.person_scraper_id,artist_id)
-				yield entry
+				try:
+					artist_entry = self.process_artist(artist,authors_birth_death)
+					if artist_entry is not None:
+						artist_ids.append(artist_entry.id)
+						yield artist_entry
+				except Exception as err:
+					print(f"process_ua artist: Unexpected {err}", file=sys.stderr)
+
+		try:
+			for artist_id in artist_ids:
+				artwork_entry.add_scraper_item(170,self.person_scraper_id,artist_id)
+			yield artwork_entry
+		except Exception as err:
+			print(f"process_ua artwork: Unexpected {err}", file=sys.stderr)
 
 	def process_artwork(self,artwork):
 		entry = Entry(self.scraper_id)
@@ -67,8 +94,29 @@ class Scraper12(ScraperBase):
 		entry.add_label_etc(url,"url","en")
 		entry.add_label_etc(artwork['title_list'],"original_label",self.language)
 		entry.add_label_etc(artwork['title_list'],"label",self.language)
-		entry.add_label_etc(artwork['title_list'],"label","en")
-		entry.add_item("P31","Q838948") # artwork
+
+		domain_denomination = []
+		if "domain_denomination" in artwork:
+			domain_denomination = artwork["domain_denomination"].split(",")
+			domain_denomination = [ dd.strip().lower() for dd in domain_denomination ]
+			domain_denomination = list(filter(lambda dd: dd!='', domain_denomination))
+		found_p31 = False
+		for dd in domain_denomination:
+			if dd in self.DOMAIN_DENOMINATION:
+				entry.add_item("P31",self.DOMAIN_DENOMINATION[dd])
+				found_p31 = True
+			else:
+				entry.add_freetext(31,dd)
+		if not found_p31: # Fallback
+			entry.add_item("P31","Q838948") # artwork
+
+		collection = None
+		if "collection" in artwork:
+			if artwork['collection']=="Centre national des arts plastiques":
+				collection = "Q2072647"
+				entry.add_item("P195",collection)
+			else:
+				entry.add_freetext(195,artwork['collection'])
 
 		if "date_creation" in artwork:
 			m = re.match(r"^(\d{3,}).*$",artwork["date_creation"])
@@ -77,32 +125,50 @@ class Scraper12(ScraperBase):
 
 		self.add_dimensions(entry,artwork['dimensions'])
 		if 'inventory' in artwork:
-			entry.add_string(217,artwork['inventory'])
+			qualifier = PropertyValue("P195",ItemValue("Q2072647"))
+			entry.add_string(217,artwork['inventory'],qualifiers=[qualifier])
 
 		if "medias" in artwork and len(artwork["medias"])>0:
 			medium = artwork["medias"][0]
 			url = f"https://images.navigart.fr/{medium['max_width']}/{medium['file_name']}"
-			entry.add_string(6500,url)
+			if "copyright" in artwork and artwork["copyright"]=="Domaine public":
+				entry.add_string(4765,url)
+			else:
+				entry.add_string(6500,url)
+		
+		authors_birth_death = ''
+		if "authors_birth_death" in artwork:
+			authors_birth_death = artwork['authors_birth_death'].strip()
 
-		yield entry
+		return (entry,authors_birth_death)
 
 	def add_dimensions(self,entry,s):
 		if s is None or s=='':
 			return
-		m = re.match(r"^.*?([0-9.]+)\s*x\s*([0-9.]+)\s*(mm|cm|m)\b.*$",s)
+		m = re.match(r"^.*?([0-9,.]+)\s*x\s([0-9,.]+)\s*x\s*([0-9,.]+)\s*(mm|cm|m)\b.*$",s)
 		if m is None:
-			return
-		
-		width = self.parse_quantity(f"{m.group(1)} {m.group(3)}")
-		if width is not None:
-			entry.add_quantity(2049,width.amount,width.unit)
+			m = re.match(r"^.*?([0-9,.]+)\s*x\s*([0-9,.]+)\s*(mm|cm|m)\b.*$",s)
+			if m is None:
+				return
+			unit_group_id = 3
+		else:
+			unit_group_id = 4
 
-		height = self.parse_quantity(f"{m.group(2)} {m.group(3)}")
+		height = self.parse_quantity(f"{m.group(1)} {m.group(unit_group_id)}")
 		if height is not None:
 			entry.add_quantity(2048,height.amount,height.unit)
 
+		width = self.parse_quantity(f"{m.group(2)} {m.group(unit_group_id)}")
+		if width is not None:
+			entry.add_quantity(2049,width.amount,width.unit)
+		
+		if unit_group_id==4:
+			depth = self.parse_quantity(f"{m.group(3)} {m.group(unit_group_id)}")
+			if depth is not None:
+				entry.add_quantity(4511,depth.amount,depth.unit)
 
-	def process_artist(self,artist):
+
+	def process_artist(self,artist,authors_birth_death):
 		if "_id" not in artist:
 			return
 		artist_id = artist["_id"]
@@ -124,8 +190,24 @@ class Scraper12(ScraperBase):
 		if "gender" in artist:
 			if artist["gender"]=="masculin":
 				entry.add_item("P21","Q6581097")
-			elif artist["gender"]=="feminin":
+			elif artist["gender"]=="féminin":
 				entry.add_item("P21","Q6581072")
 			else:
 				entry.add_freetext(21,artist['gender'])
-		yield entry
+
+		m = re.match(r"^(.*? )-( .*?)$",authors_birth_death)
+		if m is not None:
+			birth_date,birth_place = self.parse_place_date(m.group(1))
+			death_date,death_place = self.parse_place_date(m.group(2))
+			self.add_date_or_freetext("P569",birth_date,entry)
+			entry.add_freetext(19,birth_place)
+			self.add_date_or_freetext("P570",death_date,entry)
+			entry.add_freetext(20,death_place)
+
+		return entry
+
+	def parse_place_date(self, s):
+		m = re.match(r"^(.+?),\s*(.+)$",s.strip())
+		if m is None:
+			return s,'' # assuming whole string is a date
+		return str(m.group(1)).strip(),str(m.group(2))
