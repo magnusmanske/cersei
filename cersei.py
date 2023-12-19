@@ -71,7 +71,7 @@ if __name__ == "__main__":
 		#artworks.run_qs(qs_commands)
 	elif sys.argv[1] == 'fill_missing_revision_items':
 		db = ToolDatabase()
-		with db.connection.cursor() as cursor:
+		with db.get_cursor() as cursor:
 			sql = "SELECT id,scraper_id,current_revision_id FROM entry WHERE current_revision_id NOT IN (SELECT revision_id FROM revision_item)"
 			cursor.execute(sql, [])
 			rows = cursor.fetchall()
@@ -87,7 +87,7 @@ if __name__ == "__main__":
 		db = ToolDatabase()
 		entry = Entry(12)
 		entry.load_from_revision(db, 647083)
-		print (entry)
+		print (entry.values)
 	else:
 		print (f"Unknown action {sys.argv[1]}")
 

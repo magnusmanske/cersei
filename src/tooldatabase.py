@@ -11,14 +11,25 @@ class ToolDatabase :
 	}
 
 	def __init__(self):
+		self.open_connection()
+	
+	def open_connection(self):
 		self.connection = toolforge.toolsdb("s54821__cersei_p")
+	
+	def get_cursor(self):
+		self.connection.ping(reconnect=True)
+		return self.connection.cursor()
+
+	def get_dict_cursor(self):
+		self.connection.ping(reconnect=True)
+		return self.connection.cursor(pymysql.cursors.DictCursor)
 
 	def get_entry_id_for_scraper_and_id(self, scraper_id, source_id) -> int:
 		source_text_id = self.get_or_create_text(source_id)
 		return self.__get_or_create("entry",("scraper_id","source_text_id"),(scraper_id,source_text_id))
 
 	def get_current_revision_id(self, entry_id) -> int:
-		with self.connection.cursor() as cursor:
+		with self.get_cursor() as cursor:
 			sql = "SELECT `current_revision_id` FROM `entry` WHERE `id`=%s"
 			cursor.execute(sql, (entry_id, ))
 			result = cursor.fetchone()
@@ -28,14 +39,14 @@ class ToolDatabase :
 			return result[0]
 
 	def create_new_revision(self, entry_id) -> int:
-		with self.connection.cursor() as cursor:
+		with self.get_cursor() as cursor:
 			sql = "INSERT INTO `revision` (`entry_id`) VALUES (%s)"
 			cursor.execute(sql, (entry_id, ))
 			self.connection.commit()
 			return cursor.lastrowid
 
 	def set_current_revision(self,entry_id,revision_id):
-		with self.connection.cursor() as cursor:
+		with self.get_cursor() as cursor:
 			sql = "UPDATE `entry` SET `current_revision_id`=%s WHERE `id`=%s"
 			cursor.execute(sql, (revision_id, entry_id))
 			self.connection.commit()
@@ -43,7 +54,7 @@ class ToolDatabase :
 	def insert_group(self, table: str, columns: list,rows: list):
 		if len(rows) == 0:
 			return
-		with self.connection.cursor() as cursor:
+		with self.get_cursor() as cursor:
 			values = []
 			sql = "INSERT IGNORE INTO `"+table+"` (`"+"`,`".join(columns)+"`) VALUES "
 			for rownum,row in enumerate(rows):
@@ -65,12 +76,12 @@ class ToolDatabase :
 		if len(ids)==0:
 			return
 		sql = "DELETE FROM `"+table+"` WHERE `id` IN (" + ",".join(ids) + ")"
-		with self.connection.cursor() as cursor:
+		with self.get_cursor() as cursor:
 			cursor.execute(sql, ())
 			self.connection.commit()
 
 	def load_table_for_revision(self,revision_id,table):
-		with self.connection.cursor(pymysql.cursors.DictCursor) as cursor:
+		with self.get_dict_cursor() as cursor:
 			sql = "SELECT * FROM `"+table+"` WHERE `revision_id`=%s"
 			cursor.execute(sql, (revision_id,))
 			return cursor.fetchall()
@@ -80,7 +91,7 @@ class ToolDatabase :
 		placeholders = ["%s" for language in languages]
 		params = [text_id,group]
 		params += languages
-		with self.connection.cursor(pymysql.cursors.DictCursor) as cursor:
+		with self.get_dict_cursor() as cursor:
 			sql = "SELECT DISTINCT `item_id` FROM `text2item` WHERE `text_id`=%s AND `group`=%s AND `language` IN ("
 			sql += ",".join(placeholders) + ")"
 			cursor.execute(sql, params)
@@ -91,7 +102,7 @@ class ToolDatabase :
 
 
 	def get_item2text_candidates(self, scraper_id, min_count=3):
-		with self.connection.cursor(pymysql.cursors.DictCursor) as cursor:
+		with self.get_dict_cursor() as cursor:
 			sql = "SELECT * FROM vw_item_candidates WHERE scraper_id=%s AND cnt>=%s"
 			cursor.execute(sql, (scraper_id,min_count))
 			return cursor.fetchall()
@@ -99,13 +110,13 @@ class ToolDatabase :
 	def add_text2item(self,language,group,text,item):
 		item_id = int(str(item)[1:])
 		text_id = self.get_or_create_text(text)
-		with self.connection.cursor() as cursor:
+		with self.get_cursor() as cursor:
 			sql = "INSERT IGNORE INTO `text2item` (`language`,`group`,`text_id`,`item_id`) VALUES (%s,%s,%s,%s)"
 			cursor.execute(sql, (language,group,text_id,item_id))
 			return cursor.lastrowid
 
 	def get_freetext2item(self,scraper_id,group,props,language):
-		with self.connection.cursor(pymysql.cursors.DictCursor) as cursor:
+		with self.get_dict_cursor() as cursor:
 			sql = """
 				SELECT property,text2item.item_id,revision_id,freetext.id AS freetext_id FROM text2item,freetext,revision,entry
 				WHERE text2item.text_id=freetext.text_id
@@ -128,14 +139,14 @@ class ToolDatabase :
 
 	def clear_old_revisions_in_table(self,scraper_id: int,table: str):
 		sql = "DELETE FROM `"+table+"` WHERE `revision_id` IN ("+self.get_old_revision_id_query(scraper_id)+")"
-		with self.connection.cursor() as cursor:
+		with self.get_cursor() as cursor:
 			cursor.execute(sql, ())
 			self.connection.commit()
 
 	def clear_old_revisions(self,scraper_id: int):
 		sql = self.get_old_revision_id_query(scraper_id)
 		ids = []
-		with self.connection.cursor() as cursor:
+		with self.get_cursor() as cursor:
 			cursor.execute(sql, ())
 			rows = cursor.fetchall()
 			for row in rows:
@@ -143,12 +154,12 @@ class ToolDatabase :
 		if len(ids)==0:
 			return
 		sql = "DELETE FROM `revision` WHERE `id` IN ("+",".join(ids)+")"
-		with self.connection.cursor() as cursor:
+		with self.get_cursor() as cursor:
 			cursor.execute(sql, ())
 			self.connection.commit()
 
 	def get_single_row_for_id(self,table,row_id):
-		with self.connection.cursor(pymysql.cursors.DictCursor) as cursor:
+		with self.get_dict_cursor() as cursor:
 			sql = "SELECT * FROM `"+table+"` WHERE `id`=%s"
 			cursor.execute(sql, (row_id,))
 			rows = cursor.fetchall()
@@ -160,7 +171,7 @@ class ToolDatabase :
 	Returns a list of all source IDs not in the database for this scraper.
 	"""
 	def source_ids_in_wikidata_but_not_here(self,scraper_id: int,source2wiki: dict)->list:
-		with self.connection.cursor(pymysql.cursors.DictCursor) as cursor:
+		with self.get_dict_cursor() as cursor:
 			all_source_ids = {}
 			for source_id in source2wiki.keys():
 				all_source_ids[str(source_id)] = True
@@ -179,7 +190,7 @@ class ToolDatabase :
 			return list(all_source_ids.keys())
 
 	def get_revision_item(self,revision_id):
-		with self.connection.cursor() as cursor:
+		with self.get_cursor() as cursor:
 			sql = "SELECT `json` FROM `revision_item` WHERE `revision_id`=%s"
 			cursor.execute(sql, (str(revision_id)))
 			rows = cursor.fetchall()
@@ -187,14 +198,14 @@ class ToolDatabase :
 				return str(rows[0][0])
 
 	def set_revision_item(self,revision_id,json):
-		with self.connection.cursor() as cursor:
+		with self.get_cursor() as cursor:
 			sql = "INSERT IGNORE INTO `revision_item` (`revision_id`,`json`) VALUES (%s,%s)"
 			cursor.execute(sql, (str(revision_id), str(json)))
 			self.connection.commit()
 
 
 	def get_wikidata_mappings_for_source_ids(self,scraper_id,source_ids):
-		with self.connection.cursor(pymysql.cursors.DictCursor) as cursor:
+		with self.get_dict_cursor() as cursor:
 			placeholders = ["%s" for x in source_ids]
 			sql = """
 				SELECT `entry`.`id` AS `entry_id`,`text`.`value` AS `source_id`,`wikidata_mapping`.* FROM `entry`,`text`,`wikidata_mapping`
@@ -233,7 +244,7 @@ class ToolDatabase :
 		return (self.LETTER2TYPE[letter],int(item_id))
 
 	def get_entry_ids_for_source_ids(self,scraper_id,source_ids):
-		with self.connection.cursor(pymysql.cursors.DictCursor) as cursor:
+		with self.get_dict_cursor() as cursor:
 			placeholders = ["%s" for x in source_ids]
 			sql = """
 				SELECT `entry`.`id` AS `entry_id`,`text`.`value` AS `source_id` FROM `entry`,`text`
@@ -250,7 +261,7 @@ class ToolDatabase :
 			return ret
 
 	def add_log(self,event_type,relevant_id=0):
-		with self.connection.cursor() as cursor:
+		with self.get_cursor() as cursor:
 			sql = "INSERT IGNORE INTO `event_log` (`event_type`,`relevant_id`) VALUES (%s,%s)"
 			cursor.execute(sql, (event_type,relevant_id))
 			self.connection.commit()
@@ -262,7 +273,7 @@ class ToolDatabase :
 	def get_last_event(self,event_types,relevant_id=None):
 		if isinstance(event_types,str):
 			event_types = [event_types]
-		with self.connection.cursor(pymysql.cursors.DictCursor) as cursor:
+		with self.get_dict_cursor() as cursor:
 			placeholders = ["%s" for x in event_types]
 			params = event_types[:]
 			sql = "SELECT * FROM `event_log` WHERE `event_type` IN ("+",".join(placeholders)+")"
@@ -275,7 +286,7 @@ class ToolDatabase :
 
 	def add_wikidata_mapping(self,entry_id,item,method):
 		item_type,item_id = self.split_item(item)
-		with self.connection.cursor() as cursor:
+		with self.get_cursor() as cursor:
 			sql = "REPLACE INTO `wikidata_mapping` (`entry_id`,`item_type`,`item_id`,`method`) VALUES (%s,%s,%s,%s)"
 			cursor.execute(sql, (entry_id,item_type,item_id,method))
 			self.connection.commit()
@@ -290,7 +301,7 @@ class ToolDatabase :
 		return self.__get_or_create("text",("value",),(value,))
 
 	def __get_or_create(self,table: str, keys: list, values: list) -> int:
-		with self.connection.cursor() as cursor:
+		with self.get_cursor() as cursor:
 			sql = "SELECT `id` FROM `"+table+"` WHERE "
 			for num,key in enumerate(keys):
 				if num>0:
@@ -319,7 +330,7 @@ class ToolDatabase :
 
 	def query_scrapers(self):
 		sql = 'SELECT scraper.*,(SELECT count(*) FROM entry WHERE entry.scraper_id=scraper.id) AS entries FROM scraper'
-		with self.connection.cursor() as cursor:
+		with self.get_cursor() as cursor:
 			cursor.execute(sql, ())
 			self.connection.commit()
 			field_names = [i[0] for i in cursor.description]
@@ -342,7 +353,7 @@ class ToolDatabase :
 		for n in range(len(entry_ids)):
 			entry_ids[n] = f"{entry_ids[n]}"
 		sql = "SELECT `entry`.`id`,`json`,`current_revision_id` FROM `entry`,`revision_item` WHERE `entry`.`current_revision_id`=`revision_item`.`revision_id` AND `entry`.`id` IN (" + ",".join(entry_ids) + ")"
-		with self.connection.cursor() as cursor:
+		with self.get_cursor() as cursor:
 			cursor.execute(sql, [])
 			self.connection.commit()
 			rows = cursor.fetchall()
@@ -423,7 +434,7 @@ class ToolDatabase :
 			offset = int(j['offset'])
 			sql += f" OFFSET {offset}"
 
-		with self.connection.cursor() as cursor:
+		with self.get_cursor() as cursor:
 			cursor.execute(sql, params)
 			self.connection.commit()
 			field_names = [i[0] for i in cursor.description]

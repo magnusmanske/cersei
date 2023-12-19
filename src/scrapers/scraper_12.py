@@ -31,7 +31,9 @@ class Scraper12(ScraperBase):
 	def __init__(self):
 		super().__init__(12)
 		self.person_scraper_id = 13
+		self.institution_scraper_id = 15
 		self.person_entry_cache = []
+		self.institution_entry_cache = []
 		self.date_patterns = [ ("%Y",9) ]
 
 	def scrape_everything(self):
@@ -60,32 +62,35 @@ class Scraper12(ScraperBase):
 					for entry in self.process_ua(result["_source"]["ua"]):
 						yield entry
 			except Exception as err:
-				print(f"parse_index_page: Unexpected {err}", file=sys.stderr)
+				print(f"parse_index_page: {err}", file=sys.stderr)
 
 	def process_ua(self,ua):
 		if "artwork" not in ua:
 			return
-		artist_ids = []
-		artwork_entry,authors_birth_death = self.process_artwork(ua["artwork"])
+		artwork_entry,authors_birth_death,institution_ids = self.process_artwork(ua["artwork"])
+
+		try:
+			for institution_id in institution_ids:
+				artwork_entry.add_scraper_item(195,self.institution_scraper_id,institution_id)
+				for institution_entry in self.process_institution(institution_id):
+					yield institution_entry
+		except Exception as err:
+			print(f"process_ua institution: {err}", file=sys.stderr)
 		
 		if "authors" in ua:
 			if len(ua["authors"])!=1:
-				authors_birth_death = '' # To make sure not ao add dates to wrong authors
+				authors_birth_death = '' # To make sure not add dates to wrong authors
 			for artist in ua["authors"]:
 				try:
-					artist_entry = self.process_artist(artist,authors_birth_death)
+					artist_id,artist_entry = self.process_artist(artist,authors_birth_death)
+					if artist_id is not None:
+						artwork_entry.add_scraper_item(170,self.person_scraper_id,artist_id)
 					if artist_entry is not None:
-						artist_ids.append(artist_entry.id)
 						yield artist_entry
 				except Exception as err:
-					print(f"process_ua artist: Unexpected {err}", file=sys.stderr)
+					print(f"process_ua artist: {err}", file=sys.stderr)
 
-		try:
-			for artist_id in artist_ids:
-				artwork_entry.add_scraper_item(170,self.person_scraper_id,artist_id)
-			yield artwork_entry
-		except Exception as err:
-			print(f"process_ua artwork: Unexpected {err}", file=sys.stderr)
+		yield artwork_entry
 
 	def process_artwork(self,artwork):
 		entry = Entry(self.scraper_id)
@@ -110,8 +115,18 @@ class Scraper12(ScraperBase):
 		if not found_p31: # Fallback
 			entry.add_item("P31","Q838948") # artwork
 
+		institution_ids = []
+		if "localisation_if_deposit" in artwork:
+			location = artwork['localisation_if_deposit']
+			institution = location.split(':').pop().strip()
+			institution_ids.append(institution)
+			institution_id,location = self.parse_institution(institution)
+			if institution_id!='':
+				entry.add_scraper_item(276,self.institution_scraper_id,institution_id)
+
 		collection = None
 		if "collection" in artwork:
+			institution_ids.append(artwork['collection'])
 			if artwork['collection']=="Centre national des arts plastiques":
 				collection = "Q2072647"
 				entry.add_item("P195",collection)
@@ -140,7 +155,39 @@ class Scraper12(ScraperBase):
 		if "authors_birth_death" in artwork:
 			authors_birth_death = artwork['authors_birth_death'].strip()
 
-		return (entry,authors_birth_death)
+		institution_ids = list(set(institution_ids))
+		return (entry,authors_birth_death,institution_ids)
+
+	def parse_institution(self,institution_full):
+		institution_full = re.sub(r'^\s*\[.*?\]\s*','',institution_full)
+		# print (f">> {institution_full}")
+		institution_id = institution_full.strip().lower().replace(' ','_')
+		location = ''
+		m = re.match(r'^(.+?) *\((.+)\).*$',institution_full)
+		if m is not None:
+			institution_id = m.group(1).strip().lower().replace(' ','_')
+			location = m.group(2).strip()
+		# print (f":: {institution_id} / {location}")
+		return institution_id,location
+
+	def process_institution(self,institution_full):
+		institution_id,location = self.parse_institution(institution_full)
+		if institution_id=='' or institution_id in self.institution_entry_cache:
+			return
+		self.institution_entry_cache.append(institution_id)
+
+		entry = Entry(self.institution_scraper_id)
+		entry.id = institution_id
+		entry.add_item("P31","Q43229")
+		entry.add_label_etc(institution_full,"original_label",self.language)
+		entry.add_label_etc(institution_id,"label",self.language)
+
+		if location!='':
+			entry.add_freetext(131,location)
+
+		yield entry
+
+
 
 	def add_dimensions(self,entry,s):
 		if s is None or s=='':
@@ -170,14 +217,15 @@ class Scraper12(ScraperBase):
 
 	def process_artist(self,artist,authors_birth_death):
 		if "_id" not in artist:
-			return
+			return None,None
 		artist_id = artist["_id"]
 		if artist_id is None or artist_id in self.person_entry_cache:
-			return
+			return artist_id,None
 		self.person_entry_cache.append(artist_id)
 
 		entry = Entry(self.person_scraper_id)
 		entry.id = artist_id
+		entry.add_item("P31","Q5")
 
 		if "name" in artist:
 			if "list" in artist["name"]:
@@ -204,7 +252,7 @@ class Scraper12(ScraperBase):
 			self.add_date_or_freetext("P570",death_date,entry)
 			entry.add_freetext(20,death_place)
 
-		return entry
+		return artist_id,entry
 
 	def parse_place_date(self, s):
 		m = re.match(r"^(.+?),\s*(.+)$",s.strip())

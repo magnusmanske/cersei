@@ -90,7 +90,7 @@ class Entry:
 				elif table=="freetext":
 					o = FreetextValue(self.decode(row["value"]))
 				elif table=="scraper_item":
-					o = ScraperItemValue(self.decode(row["scraper_id"]),self.decode(row["ext_id"]))
+					o = ScraperItemValue(row["scraper_id"],self.decode(row["ext_id"]))
 				elif table=="monolingual_string":
 					o = MonolingualStringValue(self.decode(row["language"]),self.decode(row["value"]))
 				elif table=="labels_etc":
