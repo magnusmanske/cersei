@@ -120,7 +120,7 @@ class Scraper12(ScraperBase):
 			location = artwork['localisation_if_deposit']
 			institution = location.split(':').pop().strip()
 			institution_ids.append(institution)
-			institution_id,location = self.parse_institution(institution)
+			institution_id,location,institution_label = self.parse_institution(institution)
 			if institution_id!='':
 				entry.add_scraper_item(276,self.institution_scraper_id,institution_id)
 
@@ -161,17 +161,18 @@ class Scraper12(ScraperBase):
 	def parse_institution(self,institution_full):
 		institution_full = re.sub(r'^\s*\[.*?\]\s*','',institution_full)
 		# print (f">> {institution_full}")
+		institution_label = institution_full[0].upper() + institution_full[1:] # ucfirst
 		institution_id = institution_full.strip().lower().replace(' ','_')
 		location = ''
-		m = re.match(r'^(.+?) *\((.+)\).*$',institution_full)
+		m = re.match(r'^(.+?) *\((.+)\).*$',institution_label)
 		if m is not None:
 			institution_id = m.group(1).strip().lower().replace(' ','_')
 			location = m.group(2).strip()
 		# print (f":: {institution_id} / {location}")
-		return institution_id,location
+		return institution_id,location,institution_label
 
 	def process_institution(self,institution_full):
-		institution_id,location = self.parse_institution(institution_full)
+		institution_id,location,institution_label = self.parse_institution(institution_full)
 		if institution_id=='' or institution_id in self.institution_entry_cache:
 			return
 		self.institution_entry_cache.append(institution_id)
@@ -180,11 +181,12 @@ class Scraper12(ScraperBase):
 		entry.id = institution_id
 		entry.add_item("P31","Q43229")
 		entry.add_label_etc(institution_full,"original_label",self.language)
-		entry.add_label_etc(institution_id,"label",self.language)
+		entry.add_label_etc(institution_label,"label",self.language)
 
 		if location!='':
 			entry.add_freetext(131,location)
 
+		print (entry)
 		yield entry
 
 
