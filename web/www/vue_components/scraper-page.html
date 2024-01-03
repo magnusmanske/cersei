@@ -17,7 +17,7 @@
                     </td>
                     <td>{{e.description}}</td>
                     <td>
-                        <a v-if='e.q!=null' :href='"https://www.wikidata.org/wiki/"+e.q' target='_blank' class='wikidata'>{{e.q}}</a>
+                        <a v-if='e.q!=null' :href='"https://www.wikidata.org/wiki/Q"+e.q' target='_blank' class='wikidata'>Q{{e.q}}</a>
                     </td>
                     <td>
                         <wd-link v-if="e.p31!=null" :item='"Q"+e.p31'></wd-link>

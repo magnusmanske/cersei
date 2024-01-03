@@ -25,6 +25,18 @@ def get_scraper_from_id(scraper_id, allow_dummy=False):
 		exit(0)
 
 
+def get_scraper_ids_from_args():
+	scraper_ids = []
+	if len(sys.argv) == 3:
+		scraper_ids = [int(sys.argv[2])]
+	else:
+		db = ToolDatabase()
+		for scraper in db.query_scrapers():
+			if scraper['property'] is not None:
+				scraper_ids.append(scraper['id'])
+	return scraper_ids
+
+
 if __name__ == "__main__":
 	if sys.argv[1] in['run','test']:
 		scraper = get_scraper_from_id(sys.argv[2])
@@ -51,18 +63,22 @@ if __name__ == "__main__":
 			pass
 		scraper.get_db().add_log("end_scrape_new",scraper.scraper_id)
 	elif sys.argv[1] == 'freetext2items':
-		scraper = get_scraper_from_id(sys.argv[2],allow_dummy=True)
-		scraper.text2item_heuristic()
+		scraper_ids = get_scraper_ids_from_args()
+		for scraper_id in scraper_ids:
+			scraper = get_scraper_from_id(scraper_id,allow_dummy=True)
+			scraper.text2item_heuristic()
 	elif sys.argv[1] == 'clear_scraper_history':
 		scraper = get_scraper_from_id(sys.argv[2],allow_dummy=True)
 		scraper.get_db().add_log("clear_old_revisions",scraper.scraper_id)
 		scraper.clear_old_revisions()
 	elif sys.argv[1] == 'update_from_wikidata':
-		try:
-			scraper = get_scraper_from_id(sys.argv[2],allow_dummy=True)
-			scraper.update_from_wikidata()
-		except Exception as err:
-			print(f"Error: {err}")
+		scraper_ids = get_scraper_ids_from_args()
+		for scraper_id in scraper_ids:
+			try:
+				scraper = get_scraper_from_id(scraper_id,allow_dummy=True)
+				scraper.update_from_wikidata()
+			except Exception as err:
+				print(f"Error: {err}")
 	elif sys.argv[1] == 'artwork2qs':
 		artworks = Artworks()
 		artworks.verbose = False
@@ -85,9 +101,11 @@ if __name__ == "__main__":
 			db.set_revision_item(revision_id,json)
 	elif sys.argv[1] == 'test123':
 		db = ToolDatabase()
-		entry = Entry(12)
-		entry.load_from_revision(db, 647083)
-		print (entry.values)
+		scrapers = db.query_scrapers()
+		print (scrapers)
+		# entry = Entry(12)
+		# entry.load_from_revision(db, 647083)
+		# print (entry.values)
 	else:
 		print (f"Unknown action {sys.argv[1]}")
 

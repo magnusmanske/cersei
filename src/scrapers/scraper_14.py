@@ -1,3 +1,4 @@
+from random import shuffle
 from src.scraper_base import ScraperBase
 from bs4 import BeautifulSoup
 import requests
@@ -19,7 +20,9 @@ class Scraper14(ScraperBase):
 	def paginate_index(self):
 		letters1 = [str(letter) for letter in range(0,9)]
 		letters2 = [letter for letter in string.ascii_lowercase]
-		for letter in letters1+letters2:
+		letters = letters1+letters2
+		shuffle(letters)
+		for letter in letters:
 			pageNr = 0
 			has_next = True
 			while has_next:

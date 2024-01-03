@@ -186,7 +186,6 @@ class Scraper12(ScraperBase):
 		if location!='':
 			entry.add_freetext(131,location)
 
-		print (entry)
 		yield entry
 
 

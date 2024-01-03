@@ -167,6 +167,10 @@ class Entry:
 			for scraper_item in (self.values["scraper_item"] or []):
 				value = {"property":scraper_item.property_text(),"scraper_id":scraper_item.value.scraper_id,"ext_id":scraper_item.value.ext_id}
 				j["scraper_item"].append(value)
+			for property_value in self.values["labels_etc"]:
+				value = property_value.value
+				if value.type_name=="url":
+					j["external_url"] = value.value
 
 		j = self.dict_deep_sort(j)
 		return json.dumps(j)

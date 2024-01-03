@@ -329,7 +329,10 @@ class ToolDatabase :
 		return int(re.sub(r'\D','',str(prop)))
 
 	def query_scrapers(self):
-		sql = 'SELECT scraper.*,(SELECT count(*) FROM entry WHERE entry.scraper_id=scraper.id) AS entries FROM scraper'
+		sql = '''SELECT scraper.*,
+			(SELECT count(*) FROM entry WHERE entry.scraper_id=scraper.id) AS entries,
+			(SELECT event_type FROM event_log WHERE relevant_id=scraper.id AND event_type RLIKE "_scrape" ORDER BY `timestamp` DESC LIMIT 1) AS last_status
+			FROM scraper'''
 		with self.get_cursor() as cursor:
 			cursor.execute(sql, ())
 			self.connection.commit()

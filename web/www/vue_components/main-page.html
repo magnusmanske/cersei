@@ -39,7 +39,12 @@
                         <a v-if='s.property!=null' target='_blank' class='wikidata' :href='"https://www.wikidata.org/wiki/Property:P"+s.property'>P{{s.property}}</a>
                     </td>
                     <td><a :href='s.url' target='_blank' class='external'>{{s.url}}</a></td>
-                    <td>{{s.status}}</td>
+                    <td>
+                        {{s.status}}
+                        <div v-if='s.last_status=="begin_scrape"'>
+                            <i style="font-size: 8pt; color:red; white-space: nowrap;" tt="running"></i>
+                        </div>
+                    </td>
                     <td>
                         <a target='_blank' class='external' :href='"https://mix-n-match.toolforge.org/api.php?query=cersei_forward&scraper="+s.id' tt='see_in_mnm'></a>
                     </td>
