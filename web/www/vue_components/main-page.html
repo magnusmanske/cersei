@@ -1,69 +1,96 @@
-<template id='main-page-template'>
-<div class='container'>
+<template id="main-page-template">
+  <div class="container">
     <h1>
-        <b>C</b>entral 
-        <b>E</b>xternal 
-        <b>R</b>esource 
-        <b>S</b>craping and 
-        <b>E</b>xtraction
-        <b>I</b>nfrastructure
+      <b>C</b>entral <b>E</b>xternal <b>R</b>esource <b>S</b>craping and
+      <b>E</b>xtraction <b>I</b>nfrastructure
     </h1>
 
-    <div class='lead'>
-        A Toolforge tool to scrape external resources, extract data in a Wikidata-compatible format, and allow comparison with matching Wikidata items.
-        Also have a look at the <a href="/api.html">API documentation</a>.
+    <div class="lead">
+      A Toolforge tool to scrape external resources, extract data in a
+      Wikidata-compatible format, and allow comparison with matching Wikidata
+      items. Also have a look at the <a href="/api.html">API documentation</a>.
     </div>
 
     <div>
-        <h2>Available scrapers</h2>
-        <table class="table table-striped">
-            <thead>
-                <tr>
-                    <th tt="id"></th>
-                    <th tt="name"></th>
-                    <th tt="entries"></th>
-                    <th tt="language"></th>
-                    <th tt="property"></th>
-                    <th tt="url"></th>
-                    <th tt="status"></th>
-                    <th tt="see_in_mnm"></th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr v-for="s in scrapers">
-                    <td>{{s.id}}</td>
-                    <th><router-link :to='"/scraper/"+s.id'>{{s.name}}</router-link></th>
-                    <td style='text-align: right; font-family: Courier; font-size:12pt;'>{{new Intl.NumberFormat('en').format(s.entries)}}</td>
-                    <td>{{s.language}}</td>
-                    <td>
-                        <a v-if='s.property!=null' target='_blank' class='wikidata' :href='"https://www.wikidata.org/wiki/Property:P"+s.property'>P{{s.property}}</a>
-                    </td>
-                    <td><a :href='s.url' target='_blank' class='external'>{{s.url}}</a></td>
-                    <td>{{s.status}}</td>
-                    <td>
-                        <a target='_blank' class='external' :href='"https://mix-n-match.toolforge.org/api.php?query=cersei_forward&scraper="+s.id' tt='see_in_mnm'></a>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+      <h2>Available scrapers</h2>
+      <table class="table table-striped">
+        <thead>
+          <tr>
+            <th tt="id"></th>
+            <th tt="name"></th>
+            <th tt="entries"></th>
+            <th tt="language"></th>
+            <th tt="property"></th>
+            <th tt="url"></th>
+            <th tt="status"></th>
+            <th tt="see_in_mnm"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="s in scrapers">
+            <td>{{s.id}}</td>
+            <th>
+              <router-link :to='"/scraper/"+s.id'>{{s.name}}</router-link>
+            </th>
+            <td
+              style="text-align: right; font-family: Courier; font-size: 12pt"
+            >
+              {{new Intl.NumberFormat('en').format(s.entries)}}
+            </td>
+            <td>{{s.language}}</td>
+            <td>
+              <a
+                v-if="s.property!=null"
+                target="_blank"
+                class="wikidata"
+                :href='"https://www.wikidata.org/wiki/Property:P"+s.property'
+                >P{{s.property}}</a
+              >
+            </td>
+            <td>
+              <a :href="s.url" target="_blank" class="external">{{s.url}}</a>
+            </td>
+            <td>{{s.status}}</td>
+            <td>
+              <a
+                target="_blank"
+                class="external"
+                :href='"https://mix-n-match.toolforge.org/api.php?query=cersei_forward&scraper="+s.id'
+                tt="see_in_mnm"
+              ></a>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
-</div>
+  </div>
 </template>
 
 <script>
-'use strict';
+  "use strict";
 
-let MainPage = Vue.extend ( {
-    props : [] ,
-    data : function () { return { scrapers:[] } } ,
-    created : function () {
-        let self = this;
-        $.get('/api/scrapers',function(d){ self.scrapers = d.scrapers },'json');
-    } ,
-    updated : function () { tt.updateInterface(this.$el) ; } ,
-    mounted : function () { tt.updateInterface(this.$el) ; } ,
-    methods : {
-    } ,
-    template:'#main-page-template'
-} ) ;
+  let MainPage = Vue.extend({
+    props: [],
+    data: function () {
+      return { scrapers: [] };
+    },
+    created: function () {
+      let self = this;
+      $.get(
+        "/api/scrapers",
+        function (d) {
+          self.scrapers = d.scrapers;
+        },
+        "json",
+      );
+    },
+    updated: function () {
+      tt.updateInterface(this.$el);
+    },
+    mounted: function () {
+      tt.updateInterface(this.$el);
+    },
+    methods: {},
+    template: "#main-page-template",
+  });
 </script>
