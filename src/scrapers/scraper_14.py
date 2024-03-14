@@ -29,7 +29,7 @@ class Scraper14(ScraperBase):
 				try:
 					url = f"https://bugz.ento.org.nz/search?q={letter}&title=&author=&taxonomicName=&minDate=&maxDate=&sortBy=relevance&sortOrder=desc&page={pageNr}"
 					print (url)
-					page = requests.get(url)
+					page = requests.get(url, timeout=60)
 					html = page.text
 					yield html
 					soup = BeautifulSoup(html,features="html.parser")

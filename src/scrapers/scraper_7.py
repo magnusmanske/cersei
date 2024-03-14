@@ -33,7 +33,7 @@ class Scraper7(ScraperBase):
 			try:
 				url = f"https://www.kunstdatenbank.at/search-for-objects?page={pageNr}"
 				print(url)
-				page = requests.get(url)
+				page = requests.get(url, timeout=60)
 				html = page.text
 				yield html
 				soup = BeautifulSoup(html,features="html.parser")
@@ -68,7 +68,7 @@ class Scraper7(ScraperBase):
 		entry.add_label_etc(url,"url","en")
 		entry.add_string(973,url) # described at URL
 		entry.add_item("P31","Q838948") # artwork
-		page = requests.get(url)
+		page = requests.get(url, timeout=60)
 		html = page.text
 		soup = BeautifulSoup(html,features="html.parser")
 
@@ -135,7 +135,7 @@ class Scraper7(ScraperBase):
 		entry.add_label_etc(url,"url","en")
 		entry.add_item("P31","Q33506") # museum
 
-		page = requests.get(url)
+		page = requests.get(url, timeout=60)
 		html = page.text
 		soup = BeautifulSoup(html,features="html.parser")
 

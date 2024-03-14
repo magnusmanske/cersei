@@ -47,7 +47,7 @@ class Scraper12(ScraperBase):
 			try:
 				url = f"https://api.navigart.fr/14/artworks?&size={pageSize}&from={so_far}"
 				print(url)
-				page = requests.get(url)
+				page = requests.get(url, timeout=60)
 				j = json.loads(page.text)
 				yield j
 				totalcount = j['totalCount']

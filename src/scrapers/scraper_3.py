@@ -52,7 +52,7 @@ class Scraper3(ScraperBase):
 			is_human = True
 
 		# Load page
-		page = requests.get(url)
+		page = requests.get(url, timeout=60)
 		html = page.text
 		soup = BeautifulSoup(html,features="html.parser")
 

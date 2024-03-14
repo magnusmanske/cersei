@@ -24,7 +24,7 @@ class Scraper18(ScraperBase):
 			try:
 				url = f"https://www.theapolis.de/api/de/profiles?page={pageNr}&items={perPage}&search=&status=1&commercial=&organization="
 				print (url)
-				page = requests.get(url)
+				page = requests.get(url, timeout=60)
 				j = json.loads(page.text)
 				yield j
 				if (j['data']['currentPageNumber']+1)*perPage-1 > j['data']['totalCount']:

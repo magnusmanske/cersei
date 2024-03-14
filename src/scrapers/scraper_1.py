@@ -20,7 +20,7 @@ class Scraper1(ScraperBase):
 		while True:
 			try:
 				url = "http://slovnikceskeliteratury.cz/list.jsp?show=-&order=title&ascDesc=asc&startswith="
-				page = requests.post(url, data = {"page":1,"pageNr":pageNr})
+				page = requests.post(url, data = {"page":1,"pageNr":pageNr}, timeout=60)
 				html = page.text
 				yield html
 				soup = BeautifulSoup(html,features="html.parser")

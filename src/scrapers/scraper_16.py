@@ -25,7 +25,7 @@ class Scraper16(ScraperBase):
 			try:
 				url = f"https://standardebooks.org/ebooks?page={pageNr}&per-page=48"
 				print (url)
-				page = requests.get(url)
+				page = requests.get(url, timeout=60)
 				html = page.text
 				yield html
 				soup = BeautifulSoup(html,features="html.parser")

@@ -35,7 +35,7 @@ class Scraper10(ScraperBase):
 				try:
 					url = f"https://www.nga.gov/bin/ngaweb/collection-search-result/search.pageSize__{pageSize}.pageNumber__{pageNr}.json?artist={letter}"
 					print(url)
-					page = requests.get(url)
+					page = requests.get(url, timeout=60)
 					j = json.loads(page.text)
 					yield j
 					totalcount = j['totalcount']
