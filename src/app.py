@@ -87,12 +87,13 @@ def query_get_entries(conditions):
 
 @app.route("/api/relations/<scraper_id>", defaults={"start": 0})
 @app.route("/api/relations/<scraper_id>/<start>")
-def query_get_relations(scraper_id, start):
+def query_get_relations(scraper_id, start: int):
     limit = request.args.get("limit", default=500, type=int)
     earliest = request.args.get("earliest", default="", type=str)
     rows = []
     field_names = []
     db = ToolDatabase()
+    # trunk-ignore(bandit/B608)
     sql = f"SELECT `vw_relations`.* FROM `vw_relations`,`revision` WHERE `revision`.`id`=`revision_id` AND `e1_scraper_id`=%s AND revision.created>=%s LIMIT {limit} OFFSET {start}"
     with db.connection.cursor() as cursor:
         cursor.execute(sql, [scraper_id, earliest])

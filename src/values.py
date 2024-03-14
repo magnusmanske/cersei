@@ -30,6 +30,7 @@ class Value(metaclass=abc.ABCMeta):
         """Returns the value as a Wikidata claim"""
 
     def str_ref_qual(self):
+        """Returns a string representation of the references and qualifiers."""
         if len(self.references) + len(self.qualifiers) == 0:
             return ""
         ret = ""
@@ -46,6 +47,7 @@ class Value(metaclass=abc.ABCMeta):
         return claim  # TODO
 
     def json_compatible(self):
+        """Returns a JSON-compatible representation of the value."""
         ret = self.__dict__
         ret["classname"] = type(self).__name__
         return ret

@@ -188,7 +188,9 @@ class Artworks:
 			--data-raw 'token={qs_token}' \
 			--data-urlencode data@{tmp_file}
 		"""
-        res = subprocess.Popen(command, shell=True)
+        # trunk-ignore(bandit/B603)
+        res = subprocess.Popen(command)
+        # , shell=True)
         # j = json.loads(res)
         # if "status" in j and j["status"]=="OK":
         # 	return

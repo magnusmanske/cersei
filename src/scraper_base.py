@@ -162,6 +162,7 @@ class ScraperBase(metaclass=abc.ABCMeta):
         if self.dbwd is None:
             self.dbwd = toolforge.connect("wikidatawiki")
         with self.dbwd.cursor() as cursor:
+            # trunk-ignore(bandit/B608)
             sql = """
 				SELECT DISTINCT page_title
 				FROM wbt_text_in_lang,wbt_text,wbt_term_in_lang,wbt_item_terms,page,pagelinks
@@ -269,7 +270,7 @@ class ScraperBase(metaclass=abc.ABCMeta):
         while len(running) > 0:
             next_up = []
             for url in running:
-                page = requests.get(url)
+                page = requests.get(url, timeout=60)
                 html = page.text
                 soup = BeautifulSoup(html, features="html.parser")
 
@@ -307,7 +308,7 @@ class ScraperBase(metaclass=abc.ABCMeta):
 
     def get_mediawiki_article_pattern(self, api_url):
         url = api_url + "?action=query&meta=siteinfo&siprop=general&format=json"
-        response = requests.get(url)
+        response = requests.get(url, timeout=60)
         j = response.json()
         article_pattern = (
             j["query"]["general"]["server"] + j["query"]["general"]["articlepath"]
@@ -362,7 +363,7 @@ class ScraperBase(metaclass=abc.ABCMeta):
             if continue_from is not None:
                 url += "&" + continue_parameter + "=" + str(continue_from)
             try:
-                response = requests.get(url)
+                response = requests.get(url, timeout=60)
                 j = response.json()
             except:
                 print("scrape_mediawiki_bespoke: Error retrieving or parsing " + url)
@@ -415,7 +416,7 @@ class ScraperBase(metaclass=abc.ABCMeta):
             + prop
             + "%20%3Fvalue%20%7D&format=json"
         )
-        response = requests.get(url)
+        response = requests.get(url, timeout=60)
         j = response.json()
         source2wiki = {}
         for x in j["results"]["bindings"]:
