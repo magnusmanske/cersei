@@ -165,8 +165,9 @@ class ScraperBase(metaclass=abc.ABCMeta):
             # trunk-ignore(bandit/B608)
             sql = """
 				SELECT DISTINCT page_title
-				FROM wbt_text_in_lang,wbt_text,wbt_term_in_lang,wbt_item_terms,page,pagelinks
-				WHERE wbx_text=%s
+				FROM wbt_text_in_lang,wbt_text,wbt_term_in_lang,wbt_item_terms,page,pagelinks,linktarget
+				WHERE pl_target_id=lt_id
+                AND wbx_text=%s
 				AND wbx_id=wbxl_text_id
 				AND wbxl_language=%s
 				AND wbxl_id=wbtl_text_in_lang_id
@@ -175,8 +176,8 @@ class ScraperBase(metaclass=abc.ABCMeta):
 				AND page_title=concat("Q",wbit_item_id)
 				AND page_namespace=0
 				AND pl_from=page_id
-				AND pl_namespace=0
-				AND pl_title IN (
+				AND lt_namespace=0
+				AND lt_title IN (
 				""".replace(
                 "\n", " "
             ).strip()
